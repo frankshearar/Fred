@@ -15,8 +15,8 @@ TODO
 * Implement support for extended REs.
 * Implement derivatives for context-free grammars
 
-[![Build status on .NET](https://ci.appveyor.com/api/projects/status/aowh0espi50oqd1l)](https://ci.appveyor.com/project/frankshearar/antiunification)
-[![Build Status on Mono](https://secure.travis-ci.org/frankshearar/AntiUnification.png?branch=travis-support)](http://travis-ci.org/frankshearar/AntiUnification)
+[![Build status on .NET](https://ci.appveyor.com/api/projects/status/8ix7agowa8rrfu1k/branch/master)](https://ci.appveyor.com/project/frankshearar/fred/branch/master)
+[![Build Status on Mono](https://secure.travis-ci.org/frankshearar/Fred.png?branch=master)](http://travis-ci.org/frankshearar/Fred)
 
 Licence
 -------
