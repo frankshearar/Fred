@@ -7,6 +7,13 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Fred", "Fred\Fred.fsproj", 
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FredTest", "FredTest\FredTest.fsproj", "{1CE2C55A-3E05-4F18-970F-FE3D1102A9DF}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{F5B35AB1-FE55-4659-A818-FB9A67A69DA3}"
+	ProjectSection(SolutionItems) = preProject
+		.nuget\NuGet.Config = .nuget\NuGet.Config
+		.nuget\NuGet.exe = .nuget\NuGet.exe
+		.nuget\NuGet.targets = .nuget\NuGet.targets
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
