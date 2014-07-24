@@ -43,6 +43,7 @@
   <ItemGroup>
     <Compile Include="Regex.fs" />
     <None Include="app.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">12</MinimumVisualStudioVersion>
