@@ -39,7 +39,7 @@ Target "BuildSolution" (fun _ ->
 )
 
 Target "Test" (fun _ ->
-    !! "./FredTests/bin/Release/FredTests.dll" // Don't like that "Release" there, but we need to limit ourselves to _one_ copy of the test dll
+    !! "./FredTests/bin/Release/FredTest.dll" // Don't like that "Release" there, but we need to limit ourselves to _one_ copy of the test dll
       |> NUnit (fun p ->
           {p with
              DisableShadowCopy = true;
