@@ -1,4 +1,6 @@
-﻿namespace ParsingWithDerivatives
+﻿namespace Fred
+
+// NOTE WELL: At the moment this is _very much_ a work in progress. Stuff _does not work_.
 
 module Cfg =
 (*    let equalsOn f x (yobj:obj) =

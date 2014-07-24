@@ -1,6 +1,8 @@
 ﻿module ParserTest
 
-open ParsingWithDerivatives
+// NOTE WELL: At the moment this is _very much_ a work in progress. Stuff _does not work_.
+
+open Fred
 open NUnit.Framework
 open Cfg
 
