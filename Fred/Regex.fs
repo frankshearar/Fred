@@ -67,16 +67,17 @@ module Regex =
 
     // compact will return a new parser that recognises the same language, but is structurally simpler.
     let rec compact p =
-        let compound a b test baseParser ctor =
+        let makeCompactParser test baseParser ctor compactA compactB =
+            match test compactA, test compactB with
+            | true, true -> baseParser
+            | true, false -> compactB
+            | false, true -> compactA
+            | false, false -> ctor (compactA, compactB)
+        let compactCat a b =
             let a' = compact a
             let b' = compact b
-            match (test a'), (test b') with
-            | true, true   -> baseParser
-            | true, false  -> b'
-            | false, true  -> a'
-            | false, false -> ctor (a', b')
-        let compoundEmpty a b ctor = compound a b empty Empty ctor
-        let compoundNullable a b ctor = compound a b nullable Eps ctor
+            makeCompactParser nullable Eps (fun (x, y) ->
+                makeCompactParser empty Empty Cat a' b') a' b'
         match p with
         | p when empty p              -> Empty
         | Empty                       -> Empty // Technically, this is redundant: the first clause will take care of Empty parsers
@@ -85,20 +86,8 @@ module Regex =
         | Union (a,b) -> let a' = compact a
                          let b' = compact b
                          if a' = b' then a'
-                         else match empty a', empty b' with
-                              | true, true   -> Empty // Technically, redundant because of the first clause.
-                              | true, false  -> b'
-                              | false, true  -> a'
-                              | false, false -> Union (a', b')
-        | Cat (a, b) when nullable a || nullable b ->
-                                        let a' = compact a
-                                        let b' = compact b
-                                        match nullable a', nullable b' with
-                                        | true, true   -> Eps
-                                        | true, false  -> b'
-                                        | false, true  -> a'
-                                        | false, false -> Cat (a', b')
-        | Cat (a,b)                   -> compoundEmpty a b Cat
+                         else makeCompactParser empty Empty Union a' b'
+        | Cat (a, b) -> compactCat a b
         | Star a when empty a         -> Eps // Kleene star can always accept the empty string!
         | Star a                      -> Star (compact a)
 
