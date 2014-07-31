@@ -1,6 +1,7 @@
 ﻿module RegexTests
 
 open Fred
+open FsCheck
 open NUnit.Framework
 open Regex
 
@@ -65,6 +66,16 @@ type ``Testing``() =
         Assert.False(empty (Star Eps))
         Assert.False(empty (Star (Char 'a')))
         Assert.False(empty (Star Empty))
+    [<Test>]
+    member x.``Emptiness implies non-nullability``() =
+        let emptyNeverNullable p =
+            empty p ==> not (nullable p)
+        Check.QuickThrowOnFailure emptyNeverNullable
+    [<Test>]
+    member x.``Nullability implies non-emptiness``() =
+        let nullableNeverEmpty p =
+            nullable p ==> not (empty p)
+        Check.QuickThrowOnFailure nullableNeverEmpty
 
 [<TestFixture>]
 type ``Matching``() =
@@ -144,4 +155,127 @@ type ``Matching``() =
         listEqual ["ab"] (findMatches (Cat (Char 'a', Char 'b')) "aabbbbaa")
         listEqual ["ab"; "ab"; "ab"] (findMatches (Cat (Char 'a', Char 'b')) "aabbbbaabbab")
         listEqual ["a"; "a"; "b"; "a"; "a"; "a"] (findMatches (Union (Char 'a', Char 'b')) "aabaaa")
-        listEqual ["aa"; "aaa"] (findMatches (Star (Char 'a')) "aabaaa")
+        listEqual ["aa"; "aaa"] (findMatches (Star (Char 'a')) "aabaaa") // aka "Star is greedy"
+
+    [<Test>]
+    member x.``findSubMatch``() =
+        Assert.That(([],[]) = (findSubMatch Empty (List.ofSeq "")))
+        Assert.That(([],[]) = (findSubMatch Empty (List.ofSeq "a")))
+        Assert.That(([],[]) = (findSubMatch Eps (List.ofSeq "")))
+        Assert.That(([],List.ofSeq "a") = (findSubMatch Eps (List.ofSeq "a")))
+
+[<TestFixture>]
+type ``Compaction``() =
+    [<Test>]
+    member x.``Empty is compact``() =
+        Assert.AreEqual(Empty, compact Empty)
+    [<Test>]
+    member x.``Eps is compact``() =
+        Assert.AreEqual(Eps, compact Eps)
+    [<Test>]
+    member x.``Char is compact``() =
+        Assert.AreEqual(Char 'a', compact (Char 'a'))
+    [<Test>]
+    member x.``Empty parsers compact to Empty``() =
+        Assert.AreEqual(Empty, compact (Union (Empty, Empty)))
+//        Assert.AreEqual(Empty, compact (Cat (Empty, Empty)))
+    [<Test>]
+    member x.``Star Empty = Eps``() =
+        Assert.AreEqual(Eps, compact (Star Empty))
+    [<Test>]
+    member x.``prunes empty subparsers``() =
+        Assert.AreEqual(Char 'a', compact (Union (Empty, Char 'a')))
+        Assert.AreEqual(Char 'a', compact (Union (Char 'a', Empty)))
+    [<Test>]
+    member x.``compacts non-empty subparsers``() =
+        Assert.AreEqual(Char 'a', compact (Union (Empty, Cat (Eps, Char 'a'))))
+        Assert.AreEqual(Char 'a', compact (Union (Cat (Eps, Char 'a'), Empty)))
+    [<Test>]
+    member x.``Empty then something is empty``() =
+        let empty: Parser<char> = Empty
+        Assert.AreEqual(empty, compact (Cat (Empty, Char 'a')))
+    [<Test>]
+    member x.``Something then empty is empty``() =
+        let empty: Parser<char> = Empty
+        Assert.AreEqual(empty, compact (Cat (Char 'a', Empty)))
+    [<Test>]
+    member x.``removes nullable trailing subparsers``() =
+        Assert.AreEqual(Char 'a', compact (Cat (Char 'a', Cat (Eps, Cat (Eps, Eps)))))
+    [<Test>]
+    member x.``Nothing then something is something``() =
+        Assert.AreEqual(Char 'a', compact (Cat (Eps, Char 'a')))
+    [<Test>]
+    member x.``Nothing then something is something, and compact``() =
+        Assert.AreEqual(Char 'a', compact (Cat (Eps, Cat (Eps, Char 'a'))))
+    [<Test>]
+    member x.``Something then nothing is something``() =
+        Assert.AreEqual(Char 'a', compact (Cat (Char 'a', Eps)))
+    [<Test>]
+    member x.``Something then nothing is something, and compact``() =
+        Assert.AreEqual(Char 'a', compact (Cat (Char 'a', Cat (Eps, Eps))))
+    [<Test>]
+    member x.``Something in between nothing is something``() =
+        Assert.AreEqual(Char 'a', compact (Cat (Eps, Cat (Char 'a', Eps))))
+    [<Test>]
+    member x.``compacts sequences of parsers``() =
+        Assert.AreEqual(Cat (Char 'a', Char 'b'), compact (Cat (Cat (Eps, Char 'a'), Cat(Eps, Char 'b'))))
+    [<Test>]
+    member x.``Star of nothing is Eps``() =
+        Assert.AreEqual(Eps, compact (Star Empty))
+    [<Test>]
+    member x.``of a Union should return a compact parser``() =
+        Assert.AreEqual(Eps, compact (Union (Eps, Star Empty)))
+//    [<Test>]
+//    member x.``of a compacted parser is itself``() =
+//        let compactedParserIsCompact p =
+//            compact p = compact (compact p)
+//        Check.QuickThrowOnFailure compactedParserIsCompact
+//    [<Test>]
+//    member x.``does not alter the accepted language``() =
+//        let takeSome seq =
+//            seq
+//            |> Seq.truncate 100
+//            |> List.ofSeq
+//        let langUnaltered p =
+//            takeSome (generate p) = takeSome (generate (compact p))
+//        Check.QuickThrowOnFailure langUnaltered
+
+[<TestFixture>]
+type ``Interleaving of Seqs``() =
+    [<Test>]
+    member x.``returns empty if both subseqs are empty``() =
+        listEqual [] (List.ofSeq (interleave [Seq.empty; Seq.empty]))
+    [<Test>]
+    member x.``returns left items if right subseq is empty``() =
+        interleave [Seq.ofList [1;2;3]; Seq.empty]
+        |> List.ofSeq
+        |> listEqual [1;2;3]
+    [<Test>]
+    member x.``returns right items if left subseq is empty``() =
+        interleave [Seq.empty; Seq.ofList [1;2;3]]
+        |> List.ofSeq
+        |> listEqual [1;2;3]
+    [<Test>]
+    member x.``returns from both seqs if neither are empty``() =
+        interleave [Seq.ofList [1;2;3]; Seq.ofList [4;5;6]]
+        |> List.ofSeq
+        |> listEqual [1;4;2;5;3;6]
+    [<Test>]
+    member x.``handles empty sequences gracefully``() =
+        interleave [Seq.ofList [1;2;3]; Seq.empty; Seq.empty; Seq.ofList [4;5;6]]
+        |> List.ofSeq
+        |> listEqual [1;4;2;5;3;6]
+    [<Test>]
+    member x.``returns all elements of all sequences``() =
+        let allElemsReturned (lists: int list list) = // Why not int seq list? FsCheck chokes on generating seqs. See http://fscheck.codeplex.com/workitem/16785
+            let left =
+                lists
+                |> List.map Seq.ofList
+                |> interleave
+                |> Seq.length
+            let right =
+                lists
+                |> List.map List.length
+                |> List.fold (+) 0
+            left = right
+        Check.QuickThrowOnFailure allElemsReturned
