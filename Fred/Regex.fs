@@ -5,6 +5,8 @@
 // Counts a la {3} {2,4} {2,}
 // Character classes
 // Unions across more than 2 options
+// Move partial matches into the Eps parser, like in Might et al's paper
+// Active patterns for empty/nullable parsers
 module Regex =
     open System.Text // For StringBuilder
     type Parser<'a> =
