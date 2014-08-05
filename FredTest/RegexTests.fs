@@ -159,10 +159,22 @@ type ``Matching``() =
 
     [<Test>]
     member x.``findSubMatch``() =
-        Assert.That(([],[]) = (findSubMatch Empty (List.ofSeq "")))
-        Assert.That(([],[]) = (findSubMatch Empty (List.ofSeq "a")))
-        Assert.That(([],[]) = (findSubMatch Eps (List.ofSeq "")))
-        Assert.That(([],List.ofSeq "a") = (findSubMatch Eps (List.ofSeq "a")))
+        let equal2 (a: obj * obj) b =
+            match a,b with
+            | (a1, a2), (b1, b2) ->
+                listEqual a1 b1
+                listEqual a2 b2
+        equal2 ([],[])    (findSubMatch Empty (List.ofSeq ""))
+        equal2 ([],['a']) (findSubMatch Empty (List.ofSeq "a"))
+        equal2 ([],[])    (findSubMatch Eps (List.ofSeq ""))
+        equal2 ([],['a']) (findSubMatch Eps (List.ofSeq "a"))
+        equal2 ([], ['a'; 'a']) (findSubMatch (Cat (Char 'a', Char 'b')) (List.ofSeq "aa"))
+    [<Test>]
+    member x.``of a submatch loses no input``() =
+        let noInputLost p inputList =
+            let matchedPrefix, remainder = findSubMatch p inputList
+            (List.append matchedPrefix remainder) = inputList
+        Check.QuickThrowOnFailure noInputLost
 
 [<TestFixture>]
 type ``Compaction``() =
