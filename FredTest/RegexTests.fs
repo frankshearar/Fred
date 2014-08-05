@@ -156,7 +156,6 @@ type ``Matching``() =
         listEqual ["ab"; "ab"; "ab"] (findMatches (Cat (Char 'a', Char 'b')) "aabbbbaabbab")
         listEqual ["a"; "a"; "b"; "a"; "a"; "a"] (findMatches (Union (Char 'a', Char 'b')) "aabaaa")
         listEqual ["aa"; "aaa"] (findMatches (Star (Char 'a')) "aabaaa") // aka "Star is greedy"
-
     [<Test>]
     member x.``findSubMatch``() =
         let equal2 (a: obj * obj) b =
@@ -237,11 +236,11 @@ type ``Compaction``() =
     [<Test>]
     member x.``of a Union should return a compact parser``() =
         Assert.AreEqual(Eps, compact (Union (Eps, Star Empty)))
-//    [<Test>]
-//    member x.``of a compacted parser is itself``() =
-//        let compactedParserIsCompact p =
-//            compact p = compact (compact p)
-//        Check.QuickThrowOnFailure compactedParserIsCompact
+    [<Test>]
+    member x.``of a compacted parser is itself``() =
+        let compactedParserIsCompact p =
+            compact p = compact (compact p)
+        Check.QuickThrowOnFailure compactedParserIsCompact
 //    [<Test>]
 //    member x.``does not alter the accepted language``() =
 //        let takeSome seq =
