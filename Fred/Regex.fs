@@ -27,28 +27,6 @@ module Regex =
         | Cat (a, b)   -> nullable a && nullable b
         | Star a       -> true
 
-    // d returns the derivative of a parser with respect to the input token c.
-    // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
-    let rec d c = function
-        | Empty                      -> Empty
-        | Eps                        -> Empty
-        | Char x when x = c          -> Eps
-        | Char _                     -> Empty
-        | Union (a, b)               -> Union (d c a, d c b)
-        | Cat (a, b) when nullable a -> Union (d c b, Cat (d c a, d c b))
-        | Cat (a, b)                 -> Cat (d c a, b)
-        | Star a                     -> Cat (d c a, Star a)
-
-    // matches returns true if a parser matches the entire input.
-    let rec matches p = function
-        | []    -> nullable p
-        | x::xs -> matches (d x p) xs
-
-    // matchSeq returns true if a parser matches the entire input seq. Useful for matching Strings.
-    let matchSeq p s = 
-        List.ofSeq s
-        |> matches p
-
     // empty returns true if a parser has failed to recognise a string.
     let rec empty = function
         | Empty        -> true
@@ -83,6 +61,28 @@ module Regex =
         | Cat (a, b) -> compactCat a b
         | Star a when empty a         -> Eps // Kleene star can always accept the empty string!
         | Star a                      -> Star (compact a)
+
+    // d returns the derivative of a parser with respect to the input token c.
+    // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
+    let rec d c = function
+    | Empty                      -> Empty
+    | Eps                        -> Empty
+    | Char x when x = c          -> Eps
+    | Char _                     -> Empty
+    | Union (a, b)               -> Union (d c a, d c b)
+    | Cat (a, b) when nullable a -> Union (d c b, Cat (d c a, d c b))
+    | Cat (a, b)                 -> Cat (d c a, b)
+    | Star a                     -> Cat (d c a, Star a)
+
+    // matches returns true if a parser matches the entire input.
+    let rec matches p = function
+        | []    -> nullable p
+        | x::xs -> matches (d x p) xs
+
+    // matchSeq returns true if a parser matches the entire input seq. Useful for matching Strings.
+    let matchSeq p s =
+        List.ofSeq s
+        |> matches p
 
     // interleave returns a sequence that draws elements from each of the sequences in turn.
     // As each sequence empties, interleave forgets about the sequence.
