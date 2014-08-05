@@ -47,8 +47,7 @@ module Regex =
         let compactCat a b =
             let a' = compact a
             let b' = compact b
-            makeCompactParser nullable Eps (fun (x, y) ->
-                makeCompactParser empty Empty Cat a' b') a' b'
+            makeCompactParser empty Empty Cat a' b'
         match p with
         | p when empty p              -> Empty
         | Empty                       -> Empty // Technically, this is redundant: the first clause will take care of Empty parsers
@@ -58,6 +57,7 @@ module Regex =
                          let b' = compact b
                          if a' = b' then a'
                          else makeCompactParser empty Empty Union a' b'
+        | Cat (Eps, b) when nullable b -> b
         | Cat (a, b) -> compactCat a b
         | Star a when empty a         -> Eps // Kleene star can always accept the empty string!
         | Star a                      -> Star (compact a)

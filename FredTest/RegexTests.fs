@@ -237,6 +237,9 @@ type ``Compaction``() =
     member x.``of a Union should return a compact parser``() =
         Assert.AreEqual(Eps, compact (Union (Eps, Star Empty)))
     [<Test>]
+    member x.``Eps then something nullable is that nullable subparser``() =
+        Assert.AreEqual((Star (Char 'a')), (compact (d 'a' (Star (Char 'a')))))
+    [<Test>]
     member x.``of a compacted parser is itself``() =
         let compactedParserIsCompact p =
             compact p = compact (compact p)
