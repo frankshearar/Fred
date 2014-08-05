@@ -56,15 +56,6 @@ module Regex =
         | Cat (a, b)   -> empty a || empty b
         | Star p       -> false
 
-    // greedy returns true when a parser tries to match the longest possible sequence of input
-    let rec greedy = function
-        | Empty        -> false
-        | Eps          -> false
-        | Char _       -> false
-        | Union (a, b) -> greedy a || greedy b
-        | Cat (a, b)   -> greedy a || greedy b
-        | Star _       -> true
-
     // compact will return a new parser that recognises the same language, but is structurally simpler.
     let rec compact p =
         let makeCompactParser test baseParser ctor compactA compactB =
@@ -127,17 +118,31 @@ module Regex =
         let rec find subParser partialMatch xs =
             printfn "find %A partial: %A input: %A (empty? %A nullable? %A)" subParser partialMatch xs (empty subParser) (nullable subParser)
             match subParser, xs with
-            | _, [] when empty subParser -> [], []
-            | _, [] when nullable subParser -> partialMatch, [] // New match, no more input
+            | _, [] when empty subParser -> [], xs
+            | _, [] when nullable subParser -> partialMatch, xs // New match, no more input
             | _, [] -> [], []
-            | _, x::rest when empty subParser -> find p [] (List.tail (List.append partialMatch xs)) // No match, move along input _from the original start point_
-            | _, x::rest when greedy subParser -> find (d x subParser) (x::partialMatch) rest
-            | _, x::rest when nullable subParser -> partialMatch, xs // New match, move along
+            | _, x::rest when empty subParser -> [],xs
+            | Star rep, x::rest ->
+                let mutable remainder = x::rest
+                let mutable entireMatch = partialMatch
+                let mutable finished = false
+                while not finished do
+                    let newMatch, dregs = find rep [] remainder
+                    remainder <- dregs
+                    entireMatch <- List.append entireMatch newMatch
+                    finished <- (List.isEmpty newMatch) || (List.isEmpty dregs)
+                entireMatch, remainder
+            | _, x::rest when nullable subParser -> partialMatch, xs
             | _, x::rest -> let newMatches, dregs = find (d x subParser) (x::partialMatch) rest
                             newMatches, dregs
-        find p [] input
+        // If we found no match, return the actual remaining input... which is the remaining input.
+        match find p [] input with
+        | [], r -> [], input
+        | m, r -> m, r
 
     // findMatches returns a list of _all_ matches that a parser finds in the input.
+    // It attempts to find a prefix match - a match on the first items in the input - and, if
+    // that fails, moves one item along the input. Crude, inefficient, but it works.
     let findMatches p s =
         let toString chars =
             List.fold (fun (sb: StringBuilder) (c: char) -> sb.Append(c)) (new StringBuilder()) chars
@@ -146,7 +151,9 @@ module Regex =
         let mutable matches = []
         while not (List.isEmpty remainder) do
             let newMatch, rest = findSubMatch p remainder
-            remainder <- rest
+            remainder <- match newMatch with
+                         | [] -> List.tail remainder // No match? Move one item along.
+                         | _  -> rest
             matches   <- match newMatch with
                          | []    -> matches
                          | x::xs -> newMatch::matches
