@@ -118,19 +118,21 @@ module Regex =
         let rec find subParser partialMatch xs =
             printfn "find %A partial: %A input: %A (empty? %A nullable? %A)" subParser partialMatch xs (empty subParser) (nullable subParser)
             match subParser, xs with
-            | _, [] -> [], []
             | Star rep, _ ->
                 let mutable remainder = xs
                 let mutable entireMatch = partialMatch
                 let mutable finished = false
                 while not finished do
                     let newMatch, dregs = find rep [] remainder
-                    remainder <- dregs
-                    entireMatch <- List.append entireMatch newMatch
-                    finished <- (List.isEmpty newMatch) || (List.isEmpty dregs)
+                    if not (List.isEmpty newMatch) then
+                        // No match: end of the line for this match attempt
+                        remainder <- dregs
+                        entireMatch <- List.append entireMatch newMatch
+                    finished <- (List.isEmpty newMatch) || (List.isEmpty remainder)
                 entireMatch, remainder
             | _, _ when nullable subParser -> partialMatch, xs // New match
             | _, _ when empty subParser -> [], xs
+            | _, [] -> [], []
             | _, x::rest -> let newMatches, dregs = find (d x subParser) (x::partialMatch) rest
                             newMatches, dregs
         // If we found no match, return the actual remaining input... which is the remaining input.
