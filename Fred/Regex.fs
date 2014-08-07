@@ -53,37 +53,37 @@ module Regex =
 
     let generate p =
         let rec gen = function
-        | Empty -> Seq.empty
-        | Eps -> seq { yield [] }
-        | Char c -> seq { yield [c] }
+        | Empty       -> Seq.empty
+        | Eps         -> seq { yield [] }
+        | Char c      -> seq { yield [c] }
         | Union (a,b) -> interleave2 (gen a) (gen b)
-        | Cat (a,b) -> seq {
-                            let seqA = gen a
-                            let seqB = gen b
-                            match Seq.isEmpty seqA, Seq.isEmpty seqB with
-                            | true, true
-                            | true, false
-                            | false, true -> yield! Seq.empty
-                            | false, false ->
-                                let a = Seq.head seqA
-                                let b = Seq.head seqB
-                                yield List.append a b }
-        | Star a -> seq {
-            yield! gen Eps
-            yield! gen a }
+        | Cat (a,b)   -> seq {
+                              let seqA = gen a
+                              let seqB = gen b
+                              match Seq.isEmpty seqA, Seq.isEmpty seqB with
+                              | true, true
+                              | true, false
+                              | false, true  -> yield! Seq.empty
+                              | false, false ->
+                                  let a = Seq.head seqA
+                                  let b = Seq.head seqB
+                                  yield List.append a b }
+        | Star a      -> seq {
+                              yield! gen Eps
+                              yield! gen a }
         Seq.distinct (gen p)
 
     // exactlyEqual returns true if the only value that sequence yields - and only once - is value.
     // It's like value = Seq.exactlyOne seq, only doesn't throw an exception.
     let exactlyEqual sequence value =
         match Seq.isEmpty sequence with
-            | true -> false
+            | true  -> false
             | false ->
                 let v = Seq.head sequence
                 let s' = Seq.skip 1 sequence
                 match Seq.isEmpty s' with
                 | false -> false
-                | true -> v = value
+                | true  -> v = value
 
     // compact will return a new parser that recognises the same language, but is structurally simpler.
     let rec compact p =
@@ -95,9 +95,9 @@ module Regex =
             | p      -> nullable p
         let makeCompactParser test baseParser ctor compactA compactB =
             match test compactA, test compactB with
-            | true, true -> baseParser
-            | true, false -> compactB
-            | false, true -> compactA
+            | true, true   -> baseParser
+            | true, false  -> compactB
+            | false, true  -> compactA
             | false, false -> ctor (compactA, compactB)
         let compactCat a b =
             let a' = compact a
@@ -105,17 +105,17 @@ module Regex =
             makeCompactParser entirelyNullable Eps (fun (x, y) ->
                 makeCompactParser empty Empty Cat a' b') a' b'
         match p with
-        | p when empty p              -> Empty
-        | Empty                       -> Empty // Technically, this is redundant: the first clause will take care of Empty parsers
-        | Eps                         -> Eps
-        | Char c                      -> Char c
-        | Union (a,b) -> let a' = compact a
-                         let b' = compact b
-                         if a' = b' then a'
-                         else makeCompactParser empty Empty Union a' b'
-        | Cat (a, b) -> compactCat a b
-        | Star a when empty a         -> Eps // Kleene star can always accept the empty string!
-        | Star a                      -> Star (compact a)
+        | p when empty p      -> Empty
+        | Empty               -> Empty // Technically, this is redundant: the first clause will take care of Empty parsers
+        | Eps                 -> Eps
+        | Char c              -> Char c
+        | Union (a,b)         -> let a' = compact a
+                                 let b' = compact b
+                                 if a' = b' then a'
+                                 else makeCompactParser empty Empty Union a' b'
+        | Cat (a, b)          -> compactCat a b
+        | Star a when empty a -> Eps // Kleene star can always accept the empty string!
+        | Star a              -> Star (compact a)
 
     // d returns the derivative of a parser with respect to the input token c.
     // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
