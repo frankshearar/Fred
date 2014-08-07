@@ -36,8 +36,63 @@ module Regex =
         | Cat (a, b)   -> empty a || empty b
         | Star p       -> false
 
+    // interleave returns a sequence that draws elements from each of the sequences in turn.
+    // As each sequence empties, interleave forgets about the sequence.
+    // For instance interleave [Seq.ofList [1;2;3]; Seq.ofList [4;5;6]; Seq.empty; Seq.ofList [10;11]
+    // returns, in order, [1;4;10;2;5;11;3;6].
+    let rec interleave = function
+        | [] -> Seq.empty
+        | fst::rest -> seq {
+                            if Seq.isEmpty fst then
+                                yield! interleave rest
+                            else
+                                yield Seq.head fst
+                                // Rotate the list of sequences, so we round-robin.
+                                yield! interleave (List.append rest [Seq.skip 1 fst]) }
+    let interleave2 a b = interleave [a;b]
+
+    let generate p =
+        let rec gen = function
+        | Empty -> Seq.empty
+        | Eps -> seq { yield [] }
+        | Char c -> seq { yield [c] }
+        | Union (a,b) -> interleave2 (gen a) (gen b)
+        | Cat (a,b) -> seq {
+                            let seqA = gen a
+                            let seqB = gen b
+                            match Seq.isEmpty seqA, Seq.isEmpty seqB with
+                            | true, true
+                            | true, false
+                            | false, true -> yield! Seq.empty
+                            | false, false ->
+                                let a = Seq.head seqA
+                                let b = Seq.head seqB
+                                yield List.append a b }
+        | Star a -> seq {
+            yield! gen Eps
+            yield! gen a }
+        Seq.distinct (gen p)
+
+    // exactlyEqual returns true if the only value that sequence yields - and only once - is value.
+    // It's like value = Seq.exactlyOne seq, only doesn't throw an exception.
+    let exactlyEqual sequence value =
+        match Seq.isEmpty sequence with
+            | true -> false
+            | false ->
+                let v = Seq.head sequence
+                let s' = Seq.skip 1 sequence
+                match Seq.isEmpty s' with
+                | false -> false
+                | true -> v = value
+
     // compact will return a new parser that recognises the same language, but is structurally simpler.
     let rec compact p =
+        // entirelyNullable returns true if a parser's language is just the one word, [].
+        let rec entirelyNullable p =
+            exactlyEqual (generate p) []
+        let nullableNotStar = function
+            | Star _ -> false
+            | p      -> nullable p
         let makeCompactParser test baseParser ctor compactA compactB =
             match test compactA, test compactB with
             | true, true -> baseParser
@@ -47,7 +102,8 @@ module Regex =
         let compactCat a b =
             let a' = compact a
             let b' = compact b
-            makeCompactParser empty Empty Cat a' b'
+            makeCompactParser entirelyNullable Eps (fun (x, y) ->
+                makeCompactParser empty Empty Cat a' b') a' b'
         match p with
         | p when empty p              -> Empty
         | Empty                       -> Empty // Technically, this is redundant: the first clause will take care of Empty parsers
@@ -57,7 +113,6 @@ module Regex =
                          let b' = compact b
                          if a' = b' then a'
                          else makeCompactParser empty Empty Union a' b'
-        | Cat (Eps, b) when nullable b -> b
         | Cat (a, b) -> compactCat a b
         | Star a when empty a         -> Eps // Kleene star can always accept the empty string!
         | Star a                      -> Star (compact a)
@@ -77,40 +132,17 @@ module Regex =
     // matches returns true if a parser matches the entire input.
     let rec matches p = function
         | []    -> nullable p
-        | x::xs -> matches (d x p) xs
+        | x::xs ->
+            let deriv = (d x p)
+            let c = compact deriv
+            printfn "d c p = %A" deriv
+            printfn "compact = %A" c
+            matches c xs
 
     // matchSeq returns true if a parser matches the entire input seq. Useful for matching Strings.
     let matchSeq p s =
         List.ofSeq s
         |> matches p
-
-    // interleave returns a sequence that draws elements from each of the sequences in turn.
-    // As each sequence empties, interleave forgets about the sequence.
-    // For instance interleave [Seq.ofList [1;2;3]; Seq.ofList [4;5;6]; Seq.empty; Seq.ofList [10;11]
-    // returns, in order, [1;4;10;2;5;11;3;6].
-    let rec interleave = function
-        | [] -> Seq.empty
-        | fst::rest -> seq {
-                            if Seq.isEmpty fst then
-                                yield! interleave rest
-                            else
-                                yield Seq.head fst
-                                // Rotate the list of sequences, so we round-robin.
-                                yield! interleave (List.append rest [Seq.skip 1 fst]) }
-    let interleave2 a b = interleave [a;b]
-
-    let rec generate = function
-        | Empty -> Seq.empty
-        | Eps -> seq { yield [] }
-        | Char c -> seq { yield [c] }
-        | Union (a,b) -> interleave2 (generate a) (generate b)
-        | Cat (a,b) -> seq {
-                            let a = Seq.head (generate a)
-                            let b = Seq.head (generate b)
-                            yield List.append a b }
-        | Star a -> seq {
-            yield! generate Eps
-            yield! generate a }
 
     // findSubMatch finds the prefix of some input that matches a parser. It returns
     // the matching prefix, and the remainder of the input.
@@ -118,7 +150,7 @@ module Regex =
     // They need to match _greedily_.
     let findSubMatch p input =
         let rec find subParser partialMatch xs =
-            printfn "find %A partial: %A input: %A (empty? %A nullable? %A)" subParser partialMatch xs (empty subParser) (nullable subParser)
+//            printfn "find %A partial: %A input: %A (empty? %A nullable? %A)" subParser partialMatch xs (empty subParser) (nullable subParser)
             match subParser, xs with
             | Star rep, _ ->
                 let mutable remainder = xs
