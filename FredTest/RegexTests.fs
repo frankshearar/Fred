@@ -244,15 +244,15 @@ type ``Compaction``() =
         let compactedParserIsCompact p =
             compact p = compact (compact p)
         Check.QuickThrowOnFailure compactedParserIsCompact
-//    [<Test>]
-//    member x.``does not alter the accepted language``() =
-//        let takeSome seq =
-//            seq
-//            |> Seq.truncate 100
-//            |> List.ofSeq
-//        let langUnaltered p =
-//            takeSome (generate p) = takeSome (generate (compact p))
-//        Check.QuickThrowOnFailure langUnaltered
+    [<Test>]
+    member x.``does not alter the accepted language``() =
+        let takeSome seq =
+            seq
+            |> Seq.truncate 1000
+            |> List.ofSeq
+        let langUnaltered p =
+            takeSome (generate p) = takeSome (generate (compact p))
+        Check.QuickThrowOnFailure langUnaltered
 
 [<TestFixture>]
 type ``Interleaving of Seqs``() =
@@ -293,3 +293,41 @@ type ``Interleaving of Seqs``() =
                 |> List.fold (+) 0
             left = right
         Check.QuickThrowOnFailure allElemsReturned
+
+[<TestFixture>]
+type ``Testing exactlyEqual``() =
+    [<Test>]
+    member x.``returns true for singleton seq with expected value``() =
+        let just1 = seq {yield 1}
+        Assert.That(exactlyEqual just1 1)
+    [<Test>]
+    member x.``returns false for singleton seq with unexpected value``() =
+        let just1 = seq {yield 1}
+        Assert.False(exactlyEqual just1 2)
+        let just2 = seq {yield 2}
+        Assert.False(exactlyEqual just2 1)
+    [<Test>]
+    member x.``returns false for empty sequences``() =
+        let alwaysFalse value =
+            false = exactlyEqual Seq.empty value
+        Check.QuickThrowOnFailure alwaysFalse
+    [<Test>]
+    member x.``returns false for multi-item sequences``() =
+        let alwaysFalse value =
+            let twoVals = seq { yield 1; yield 2}
+            false = exactlyEqual twoVals value
+        Check.QuickThrowOnFailure alwaysFalse
+    [<Test>]
+    member x.``returns false for two-item sequences (first)``() =
+        let alwaysFalseForFirstVal pair =
+            let s = match pair with
+                    | a, b -> seq {yield a; yield b}
+            false = exactlyEqual s (fst pair)
+        Check.QuickThrowOnFailure alwaysFalseForFirstVal
+    [<Test>]
+    member x.``returns false for two-item sequences (second)``() =
+        let alwaysFalseForSecondVal pair =
+            let s = match pair with
+                    | a, b -> seq {yield a; yield b}
+            false = exactlyEqual s (snd pair)
+        Check.QuickThrowOnFailure alwaysFalseForSecondVal
