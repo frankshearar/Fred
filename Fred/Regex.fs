@@ -7,6 +7,8 @@
 // Unions across more than 2 options
 // Move partial matches into the Eps parser, like in Might et al's paper
 // Active patterns for empty/nullable parsers
+// Zipper-based compaction, that will compact from the leaves, working its
+// way to the root by compacting in the "make new node" step.
 module Regex =
     open System.Text // For StringBuilder
     type Parser<'a> =
