@@ -189,7 +189,7 @@ type ``Compaction``() =
     [<Test>]
     member x.``Empty parsers compact to Empty``() =
         Assert.AreEqual(Empty, compact (Union (Empty, Empty)))
-//        Assert.AreEqual(Empty, compact (Cat (Empty, Empty)))
+        Assert.AreEqual(Empty, compact (Cat (Empty, Empty)))
     [<Test>]
     member x.``Star Empty = Eps``() =
         Assert.AreEqual(Eps, compact (Star Empty))
