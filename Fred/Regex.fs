@@ -67,6 +67,10 @@ module Regex =
                               | true, false
                               | false, true  -> yield! Seq.empty
                               | false, false ->
+                                  // TODO:
+                                  // This is wrong: it creates "pairs" of values like a zip,
+                                  // when it should generate something like the cartesian
+                                  // product of the words of each language.
                                   let a = Seq.head seqA
                                   let b = Seq.head seqB
                                   yield List.append a b }
