@@ -141,8 +141,8 @@ module Regex =
         | x::xs ->
             let deriv = (d x p)
             let c = compact deriv
-            printfn "d c p = %A" deriv
-            printfn "compact = %A" c
+//            printfn "d c p = %A" deriv
+//            printfn "compact = %A" c
             matches c xs
 
     // matchSeq returns true if a parser matches the entire input seq. Useful for matching Strings.
