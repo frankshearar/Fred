@@ -176,7 +176,7 @@ type ``Matching``() =
         Check.QuickThrowOnFailure noInputLost
 
 [<TestFixture>]
-type ``Compaction``() =
+type ``Compacting``() =
     [<Test>]
     member x.``Empty is compact``() =
         Assert.AreEqual(Empty, compact Empty)
@@ -234,6 +234,9 @@ type ``Compaction``() =
     member x.``Star of nothing is Eps``() =
         Assert.AreEqual(Eps, compact (Star Empty))
     [<Test>]
+    member x.``Star of Eps is Eps``() =
+        Assert.AreEqual(Eps, compact (Star Eps))
+    [<Test>]
     member x.``of a Union should return a compact parser``() =
         Assert.AreEqual(Eps, compact (Union (Eps, Star Empty)))
     [<Test>]
@@ -242,7 +245,8 @@ type ``Compaction``() =
     [<Test>]
     member x.``of a compacted parser is itself``() =
         let compactedParserIsCompact p =
-            compact p = compact (compact p)
+            let cp = compact p
+            cp = compact cp
         Check.QuickThrowOnFailure compactedParserIsCompact
     [<Test>]
     member x.``does not alter the accepted language``() =
@@ -275,6 +279,15 @@ type ``Interleaving of Seqs``() =
         |> List.ofSeq
         |> listEqual [1;4;2;5;3;6]
     [<Test>]
+    member x.``can use infinite sequences``() =
+        let constantly v _ = v
+        let numberCounts = interleave [Seq.initInfinite (constantly 1); Seq.initInfinite (constantly 2)]
+                           |> Seq.take 1000
+                           |> Seq.countBy (fun x -> x)
+                           |> List.ofSeq
+        listEqual [1,500;2,500] numberCounts
+
+    [<Test>]
     member x.``handles empty sequences gracefully``() =
         interleave [Seq.ofList [1;2;3]; Seq.empty; Seq.empty; Seq.ofList [4;5;6]]
         |> List.ofSeq
@@ -293,6 +306,14 @@ type ``Interleaving of Seqs``() =
                 |> List.fold (+) 0
             left = right
         Check.QuickThrowOnFailure allElemsReturned
+
+[<TestFixture>]
+type ``Taking the product of Seqs``() =
+    [<Test>]
+    member x.``returns all combinations of all elements of both sequences``() =
+        let cartesianProductHasExpectedLength seqA seqB =
+            Seq.length (prod seqA seqB) = (Seq.length seqA) * (Seq.length seqB)
+        Check.QuickThrowOnFailure cartesianProductHasExpectedLength
 
 [<TestFixture>]
 type ``Testing exactlyEqual``() =

@@ -42,6 +42,7 @@ module Regex =
     // As each sequence empties, interleave forgets about the sequence.
     // For instance interleave [Seq.ofList [1;2;3]; Seq.ofList [4;5;6]; Seq.empty; Seq.ofList [10;11]
     // returns, in order, [1;4;10;2;5;11;3;6].
+    // O(n^2)! Likely because of that List.append...
     let rec interleave = function
         | [] -> Seq.empty
         | fst::rest -> seq {
@@ -53,6 +54,29 @@ module Regex =
                                 yield! interleave (List.append rest [Seq.skip 1 fst]) }
     let interleave2 a b = interleave [a;b]
 
+    // interleaveSeq returns a sequence that draws elements from each of the sequences in turn.
+    // As each sequence empties, interleave forgets about the sequence.
+    // O(n), but doesn't interleave fairly!
+    let rec interleaveSeq seqs =
+        seq {
+             for s in seqs do
+                 if not (Seq.isEmpty s) then
+                     yield Seq.head s
+             let remainder = Seq.filter (fun s -> not (Seq.isEmpty s)) seqs
+             if not (Seq.isEmpty remainder) then
+                 yield! interleaveSeq (Seq.map (Seq.skip 1) remainder)}
+
+    // prod turns a pair of Seqs into a Seq of pairs representing
+    // the Cartesian product of the Seqs.
+    let rec prod xs ys =
+        seq {
+            for x in xs do
+                for y in ys do
+                    yield x,y}
+
+    // generate generates every word in the language described by a parser p.
+    // It does so in a fair manner, in that the union of two parsers a and b
+    // will return words from a and b, in order.
     let generate p =
         let rec gen = function
         | Empty       -> Seq.empty
@@ -66,14 +90,8 @@ module Regex =
                               | true, true
                               | true, false
                               | false, true  -> yield! Seq.empty
-                              | false, false ->
-                                  // TODO:
-                                  // This is wrong: it creates "pairs" of values like a zip,
-                                  // when it should generate something like the cartesian
-                                  // product of the words of each language.
-                                  let a = Seq.head seqA
-                                  let b = Seq.head seqB
-                                  yield List.append a b }
+                              | false, false -> yield! (prod seqA seqB |> Seq.map (fun (a,b) -> List.append a b))
+                            }
         | Star a      -> seq {
                               yield! gen Eps
                               yield! gen a }
@@ -121,6 +139,7 @@ module Regex =
                                  else makeCompactParser empty Empty Union a' b'
         | Cat (a, b)          -> compactCat a b
         | Star a when empty a -> Eps // Kleene star can always accept the empty string!
+        | Star Eps            -> Eps
         | Star a              -> Star (compact a)
 
     // d returns the derivative of a parser with respect to the input token c.
@@ -140,7 +159,7 @@ module Regex =
         | []    -> nullable p
         | x::xs ->
             let deriv = (d x p)
-            let c = compact deriv
+            let c = deriv//compact deriv
 //            printfn "d c p = %A" deriv
 //            printfn "compact = %A" c
             matches c xs
