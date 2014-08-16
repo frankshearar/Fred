@@ -74,6 +74,21 @@ module Regex =
                 for y in ys do
                     yield x,y}
 
+    // expandAsStar produces a sequence of parsers representing the "unfolding"
+    // of a Kleene star: given a parser p, it produces p, pp, ppp, pppp, ...
+    // The parsers returned are compact: if you give an empty parser, you
+    // just get [Eps] back, because a Star parser can always accept no input.
+    let expandAsStar parser =
+        match empty parser with
+        | true -> seq { yield Eps }
+        | false -> Eps
+                   |> Seq.unfold (fun p ->
+                           let newP = match p with
+                                      | Eps        -> parser      // 0 -> a
+                                      | Cat (a, b) -> Cat (a, p)  // a^n -> a^{n+1}
+                                      | a          -> Cat (a, a)  // a -> aa
+                           Option.Some (p, newP))
+
     // generate generates every word in the language described by a parser p.
     // It does so in a fair manner, in that the union of two parsers a and b
     // will return words from a and b, in order.
@@ -93,8 +108,9 @@ module Regex =
                               | false, false -> yield! (prod seqA seqB |> Seq.map (fun (a,b) -> List.append a b))
                             }
         | Star a      -> seq {
-                              yield! gen Eps
-                              yield! gen a }
+                              // expandAsStar generates 0, a, aa, aaa, ...
+                              let allStar = expandAsStar a |> Seq.truncate 100 // Allow only up to a^100: while interleaveSeq _should_ handle an infinite number of seqs, it doesn't.
+                              yield! interleaveSeq (Seq.map gen allStar)}
         Seq.distinct (gen p)
 
     // exactlyEqual returns true if the only value that sequence yields - and only once - is value.

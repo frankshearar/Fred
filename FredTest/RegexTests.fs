@@ -247,19 +247,43 @@ type ``Compacting``() =
         Assert.AreEqual((Star (Char 'a')), (compact (d 'a' (Star (Char 'a')))))
     [<Test>]
     member x.``of a compacted parser is itself``() =
+        // counterexample: Star (Star Eps)
         let compactedParserIsCompact p =
             let cp = compact p
             cp = compact cp
         Check.QuickThrowOnFailure compactedParserIsCompact
+//    [<Test>]
+//    member x.``does not alter the accepted language``() =
+//        let takeSome seq =
+//            seq
+//            |> Seq.truncate 1000
+//            |> Set.ofSeq
+//        let langUnaltered p =
+//            takeSome (generate p) = takeSome (generate (compact p))
+//        Check.QuickThrowOnFailure langUnaltered
+
+[<TestFixture>]
+type ``Generating``() =
     [<Test>]
-    member x.``does not alter the accepted language``() =
-        let takeSome seq =
-            seq
-            |> Seq.truncate 1000
-            |> List.ofSeq
-        let langUnaltered p =
-            takeSome (generate p) = takeSome (generate (compact p))
-        Check.QuickThrowOnFailure langUnaltered
+    member x.``Empty generates the empty set``() =
+        listEqual [] (generate Empty |> List.ofSeq)
+    [<Test>]
+    member x.``Eps generates just the empty string``() =
+        listEqual [[]] (generate Eps |> List.ofSeq)
+    [<Test>]
+    member x.``Char generates just its own token``() =
+        listEqual [['a']] (generate (Char 'a') |> List.ofSeq)
+        listEqual [[1]] (generate (Char 1) |> List.ofSeq)
+        listEqual [[[|1;2|]]] (generate (Char [|1;2|]) |> List.ofSeq)
+    [<Test>]
+    member x.``Union generates, in lexicographic order, all words from both sublanguages``() =
+        listEqual [['a']; ['b']] (generate (Union (Char 'a', Char 'b')) |> List.ofSeq)
+    [<Test>]
+    member x.``Cat generates words by appending words from the first language to words from the second``() =
+        listEqual [['a'; 'b']] (generate (Cat (Char 'a', Char 'b')) |> List.ofSeq)
+    [<Test>]
+    member x.``Star returns all repetitions of its sublanguage``() =
+        listEqual [[]; ['a']; ['a'; 'a']; ['a';'a';'a']] (generate (Star (Char 'a')) |> Seq.take 4 |> List.ofSeq)
 
 [<TestFixture>]
 type ``Interleaving of Seqs``() =
@@ -357,3 +381,32 @@ type ``Testing exactlyEqual``() =
                     | a, b -> seq {yield a; yield b}
             false = exactlyEqual s (snd pair)
         Check.QuickThrowOnFailure alwaysFalseForSecondVal
+    [<Test>]
+    member x.``handles infinite sequences``() =
+        let infinite1s = Seq.initInfinite (fun i -> 1)
+        Assert.False(exactlyEqual infinite1s 1)
+
+[<TestFixture>]
+type ``Testing expandAsStar``() =
+    [<Test>]
+    member x.``empty parsers yield just Eps``() =
+        let emptyParserYieldsEps p = not (empty p) ==> lazy ([Eps] = (p |> expandAsStar |> Seq.truncate 2 |> List.ofSeq))
+        Check.QuickThrowOnFailure emptyParserYieldsEps
+    [<Test>]
+    member x.``yields Eps as first element``() =
+        let alwaysProduceEps p = not (empty p) ==> lazy (Eps = Seq.head (expandAsStar p))
+        Check.QuickThrowOnFailure alwaysProduceEps
+    [<Test>]
+    member x.``expands a parser p into a sequence whose elements approximate p*``() =
+        // counterexample: Cat (Eps,Eps)
+        let expandOneStep p =
+            not (empty p) ==> lazy (
+                let baseSeq = expandAsStar p
+                let remainder = Seq.skip 1 baseSeq
+                Seq.zip baseSeq remainder
+                |> Seq.truncate 100
+                |> Seq.filter (fun (x,y) -> match y with
+                                            | Cat (a,b) -> printfn "%A = %A" x y; x = b
+                                            | _ -> false)
+                |> Seq.isEmpty)
+        Check.QuickThrowOnFailure expandOneStep
