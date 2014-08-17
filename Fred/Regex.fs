@@ -110,14 +110,13 @@ module Regex =
                 | true  -> v = value
 
     let rec postfixWalk f (merge: Parser<'a> -> Parser<'a> -> Parser<'a> -> Parser<'a>) p =
-        let r = match p with
-                | Empty
-                | Eps
-                | Char _      -> f p
-                | Cat (a,b)   -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
-                | Union (a,b) -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
-                | Star a      -> merge p (postfixWalk f merge a) Empty // Stinky hack so that we only need one merge function, taking two children.
-        r
+        match p with
+        | Empty
+        | Eps
+        | Char _      -> f p
+        | Cat (a,b)   -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
+        | Union (a,b) -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
+        | Star a      -> merge p (postfixWalk f merge a) Empty // Stinky hack so that we only need one merge function, taking two children.
 
     let compact p =
         p |>
