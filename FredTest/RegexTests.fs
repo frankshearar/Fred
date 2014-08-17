@@ -240,6 +240,9 @@ type ``Compacting``() =
     member x.``of a Union should return a compact parser``() =
         Assert.AreEqual(Eps, compact (Union (Eps, Star Empty)))
     [<Test>]
+    member x.``of a Union of two identical parser should return that parser, compacted``() =
+        Assert.AreEqual(Eps, compact (Union (Star Empty, Star Empty)))
+    [<Test>]
     member x.``Eps then something nullable is that nullable subparser``() =
         Assert.AreEqual((Star (Char 'a')), (compact (d 'a' (Star (Char 'a')))))
     [<Test>]
@@ -311,7 +314,9 @@ type ``Interleaving of Seqs``() =
 type ``Taking the product of Seqs``() =
     [<Test>]
     member x.``returns all combinations of all elements of both sequences``() =
-        let cartesianProductHasExpectedLength seqA seqB =
+        let cartesianProductHasExpectedLength listA listB = // Geneflect can't generate seqs, so take lists instead.
+            let seqA = listA |> Seq.ofList
+            let seqB = listB |> Seq.ofList
             Seq.length (prod seqA seqB) = (Seq.length seqA) * (Seq.length seqB)
         Check.QuickThrowOnFailure cartesianProductHasExpectedLength
 
