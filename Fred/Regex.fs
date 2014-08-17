@@ -109,38 +109,37 @@ module Regex =
                 | false -> false
                 | true  -> v = value
 
-    // compact will return a new parser that recognises the same language, but is structurally simpler.
-    let rec compact p =
-        // entirelyNullable returns true if a parser's language is just the one word, [].
-        let rec entirelyNullable p =
-            exactlyEqual (generate p) []
-        let nullableNotStar = function
-            | Star _ -> false
-            | p      -> nullable p
-        let makeCompactParser test baseParser ctor compactA compactB =
-            match test compactA, test compactB with
-            | true, true   -> baseParser
-            | true, false  -> compactB
-            | false, true  -> compactA
-            | false, false -> ctor (compactA, compactB)
-        let compactCat a b =
-            let a' = compact a
-            let b' = compact b
-            makeCompactParser entirelyNullable Eps (fun (x, y) ->
-                makeCompactParser empty Empty Cat a' b') a' b'
-        match p with
-        | p when empty p      -> Empty
-        | Empty               -> Empty // Technically, this is redundant: the first clause will take care of Empty parsers
-        | Eps                 -> Eps
-        | Char c              -> Char c
-        | Union (a,b)         -> let a' = compact a
-                                 let b' = compact b
-                                 if a' = b' then a'
-                                 else makeCompactParser empty Empty Union a' b'
-        | Cat (a, b)          -> compactCat a b
-        | Star a when empty a -> Eps // Kleene star can always accept the empty string!
-        | Star Eps            -> Eps
-        | Star a              -> Star (compact a)
+    let rec postfixWalk f (merge: Parser<'a> -> Parser<'a> -> Parser<'a> -> Parser<'a>) p =
+        let r = match p with
+                | Empty
+                | Eps
+                | Char _      -> f p
+                | Cat (a,b)   -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
+                | Union (a,b) -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
+                | Star a      -> merge p (postfixWalk f merge a) Empty // Stinky hack so that we only need one merge function, taking two children.
+        r
+
+    let compact p =
+        p |>
+        postfixWalk (fun x -> x)
+                    (fun parent childA childB -> //printfn "%A <- %A + %A" parent childA childB
+                                                 match parent with
+                                                 | Empty | Eps | Char _ -> parent
+                                                 | Cat _ -> match childA,childB with
+                                                            | Empty, _ -> Empty
+                                                            | _, Empty -> Empty
+                                                            | Eps, Eps -> Eps
+                                                            | Eps, _   -> childB
+                                                            | _,   Eps -> childA
+                                                            | _        -> Cat (childA, childB)
+                                                 | Union _ -> match childA,childB with
+                                                              | Empty, Empty -> Empty
+                                                              | Empty, _     -> childB
+                                                              | _,     Empty -> childA
+                                                              | _            -> if childA = childB then childA else Union (childA, childB)
+                                                 | Star _ -> match childA with // Note we ignore childB.
+                                                             | Empty | Eps -> Eps
+                                                             | _ -> Star childA)
 
     // d returns the derivative of a parser with respect to the input token c.
     // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
