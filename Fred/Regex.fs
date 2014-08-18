@@ -94,7 +94,7 @@ module Regex =
                             }
         | Star a      -> seq {
                               yield! gen Eps
-                              yield! gen a }
+                              yield! gen a } // <-- This is wrong. See the generate-kleene-star-languages branch for explorations in fixing the bug.
         Seq.distinct (gen p)
 
     // exactlyEqual returns true if the only value that sequence yields - and only once - is value.
@@ -121,7 +121,7 @@ module Regex =
     let compact p =
         p |>
         postfixWalk (fun x -> x)
-                    (fun parent childA childB -> //printfn "%A <- %A + %A" parent childA childB
+                    (fun parent childA childB ->
                                                  match parent with
                                                  | Empty | Eps | Char _ -> parent
                                                  | Cat _ -> match childA,childB with
