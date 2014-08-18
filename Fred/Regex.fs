@@ -109,7 +109,13 @@ module Regex =
                 | false -> false
                 | true  -> v = value
 
-    let rec postfixWalk f (merge: Parser<'a> -> Parser<'a> -> Parser<'a> -> Parser<'a>) p =
+    // postfixWalk walks a regex parser in depth first order, running a function f on each
+    // parser. postfixWalk applies the merge parameter when exiting a subtree, takes a
+    // parent node and a pair of _possibly new_ child nodes.
+    // (We pretend that Star has a second child, always Empty, to avoid passing around
+    // multiple merge-like functions. The alternative - use a parent + list of children
+    // as signature - means throwing away arity protection.)
+    let rec postfixWalk f merge p =
         match p with
         | Empty
         | Eps
