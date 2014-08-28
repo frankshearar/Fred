@@ -1,12 +1,18 @@
 ﻿namespace Fred
 
 // TODO:
-// Short-hand string so you can say /[a-z]+/ or whatever
+// Short-hand string so you can say /[a-z]+/ or whatever <-- ?? see puffnfresh's comments about "improve regex by removing stringly typing & parsing"
 // Counts a la {3} {2,4} {2,}
 // Character classes
-// Unions across more than 2 options
 // Move partial matches into the Eps parser, like in Might et al's paper
+// Reduction parsers apply a function to a match.
 // Active patterns for empty/nullable parsers
+//
+// SOUNDS GREAT BUT:
+// Unions across more than 2 options:
+// * UnionN of list: 3x slower than folded Unions (for 5 elements)
+// * UnionN of array: 2x slower than folded Unions (for 5 elements)
+
 module Regex =
     open System.Text // For StringBuilder
     type Parser<'a> =
