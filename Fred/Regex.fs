@@ -7,6 +7,8 @@
 // Move partial matches into the Eps parser, like in Might et al's paper
 // Reduction parsers apply a function to a match.
 // Active patterns for empty/nullable parsers
+// Check against the rules in http://plastic-idolatry.com/erik/oslo2014.pdf Investigate application of derivatives to other *-semirings
+// Operator overloading? + -> Union, * -> Cat, ... ?
 //
 // SOUNDS GREAT BUT:
 // Unions across more than 2 options:
