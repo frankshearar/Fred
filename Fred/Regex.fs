@@ -328,19 +328,19 @@ module Regex =
 
     // Helper functions
 
-    // anyToken is like Union, but for n tokens, not just two.
-    let rec anyToken tokens =
+    // any is like Union, but for n tokens, not just two.
+    let rec any tokens =
         match tokens with
         | [] -> Empty
         | [x] -> Char x
-        | x::xs -> Union (Char x, anyToken xs)
+        | x::xs -> Union (Char x, any xs)
 
-    let alpha = anyToken (List.append ['A'..'Z'] ['a'..'z'])
-    let num = anyToken ['0'..'9']
+    let alpha = any (List.append ['A'..'Z'] ['a'..'z'])
+    let num = any ['0'..'9']
     let alphanum = Union (alpha, num)
 
     // alltokens is like Cat, but for n tokens, not just two.
-    let rec allTokens tokens =
+    let rec all tokens =
         match tokens with
         | []    -> Empty
         | [x]   -> Char x
