@@ -339,7 +339,7 @@ module Regex =
     let num = any ['0'..'9']
     let alphanum = Union (alpha, num)
 
-    // alltokens is like Cat, but for n tokens, not just two.
+    // all is like Cat, but for n tokens, not just two.
     let rec all tokens =
         match tokens with
         | []    -> Empty
