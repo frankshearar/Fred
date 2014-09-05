@@ -1,4 +1,4 @@
-﻿module RegexCompactingTest
+﻿module Regex.Test.Compacting
 
 open Fred
 open FsCheck
