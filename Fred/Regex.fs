@@ -5,6 +5,7 @@
 // Counts a la {3} {2,4} {2,}
 // Character classes
 // Reduction parsers apply a function to a match.
+// Negation
 // Active patterns for empty/nullable parsers
 // Check against the rules in http://plastic-idolatry.com/erik/oslo2014.pdf Investigate application of derivatives to other *-semirings
 // Operator overloading? + -> Union, * -> Cat, ... ?
@@ -187,6 +188,8 @@ module Regex =
                     (fun parent childA childB ->
                                                  match parent with
                                                  | Empty | Eps | Eps' _ | Char _ -> parent
+                                                 // TODO: Compact Cat (Eps' a, Eps' b) to something like Eps' (a@b)
+                                                 // Easiest done with a Red parser.
                                                  | Cat _ -> match childA,childB with
                                                             | Empty, _     -> Empty
                                                             | _, Empty     -> Empty

@@ -156,7 +156,7 @@ type ``Deriving parse trees``() =
     [<Test>]
     member x.``Char is Eps' when a match``() =
         let charDerivesToEpsForMatch (x: char) =
-            Eps' (Set.singleton [x]) = (dP x (Char x))
+            Eps' (set [[x]]) = (dP x (Char x))
         Check.QuickThrowOnFailure charDerivesToEpsForMatch
     [<Test>]
     member x.``Char is Empty when not a match``() =
@@ -218,10 +218,10 @@ type ``Matching``() =
         Assert.That(matches Eps [])
     [<Test>]
     member x.``Eps' [] matches empty input``() =
-        Assert.That(matches (Eps' (Set.singleton [])) [])
+        Assert.That(matches (Eps' (set [[]])) [])
     [<Test>]
     member x.``Eps' [] doesn't match non-empty input``() =
-        Assert.False(matches (Eps' (Set.singleton [])) ['a'])
+        Assert.False(matches (Eps' (set [[]])) ['a'])
     [<Test>]
     member x.``Char matches own token``() =
         Assert.That(matches (Char 'a') ['a'])
@@ -274,7 +274,7 @@ type ``Matching``() =
         Assert.AreEqual([], (findMatches Eps ""))
     [<Test>]
     member x.``Parsing empty string with an Eps [] gives no matches``() =
-        Assert.AreEqual([], (findMatches (Eps' (Set.singleton [])) ""))
+        Assert.AreEqual([], (findMatches (Eps' (set [[]])) ""))
     [<Test>]
     member x.``Parsing empty string with any parser gives no matches``() =
         Assert.AreEqual([], (findMatches (Char 'a') ""))
@@ -304,8 +304,8 @@ type ``Matching``() =
         equal2 ([],['a']) (findSubMatch Empty (List.ofSeq "a"))
         equal2 ([],[])    (findSubMatch Eps (List.ofSeq ""))
         equal2 ([],['a']) (findSubMatch Eps (List.ofSeq "a"))
-        equal2 ([],[])    (findSubMatch (Eps' (Set.singleton [])) (List.ofSeq ""))
-        equal2 ([],['a']) (findSubMatch (Eps' (Set.singleton [])) (List.ofSeq "a"))
+        equal2 ([],[])    (findSubMatch (Eps' (set [[]])) (List.ofSeq ""))
+        equal2 ([],['a']) (findSubMatch (Eps' (set [[]])) (List.ofSeq "a"))
         equal2 ([], ['a'; 'a']) (findSubMatch (Cat (Char 'a', Char 'b')) (List.ofSeq "aa"))
     [<Test>]
     member x.``of a submatch loses no input``() =
@@ -324,7 +324,7 @@ type ``Compacting``() =
         Assert.AreEqual(Eps, compact (Eps))
     [<Test>]
     member x.``Eps [] is compact``() =
-        Assert.AreEqual(Eps' (Set.singleton []), compact (Eps' (Set.singleton [])))
+        Assert.AreEqual(Eps' (set [[]]), compact (Eps' (set [[]])))
     [<Test>]
     member x.``Char is compact``() =
         Assert.AreEqual(Char 'a', compact (Char 'a'))
@@ -356,7 +356,7 @@ type ``Compacting``() =
         Assert.AreEqual(Char 'a', compact (Cat (Char 'a', Cat (Eps, Cat (Eps, Eps)))))
     [<Test>]
     member x.``does not remove nullable trailing subparsers with partial parse trees``() =
-        let p = (Cat (Char 'a', Cat ((Eps' (Set.singleton [])), Cat ((Eps' (Set.singleton [])), (Eps' (Set.singleton []))))))
+        let p = (Cat (Char 'a', Cat ((Eps' (set [[]])), Cat ((Eps' (set [[]])), (Eps' (set [[]]))))))
         Assert.AreEqual(p, compact p)
     [<Test>]
     member x.``Nothing then something is something``() =
@@ -567,7 +567,7 @@ type ``Building parse trees``() =
     [<Test>]
     member x.``from Eps should yield sole parse tree``() =
         let justOneParse (t: char list) =
-            Set.singleton t = (parseNull (Eps' (Set.singleton t)))
+            set [t] = (parseNull (Eps' (set [t])))
         Check.QuickThrowOnFailure justOneParse
     [<Test>]
     member x.``from Empty should yield no parses``() =
