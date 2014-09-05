@@ -116,12 +116,12 @@ type ``Matching``() =
         Check.QuickThrowOnFailure noInputLost
 
 [<TestFixture>]
-type ``Testing anyToken``() =
+type ``Testing any``() =
     [<Test>]
     member x.``should accept any of the listed tokens``() =
         let nonEmptyAcceptsAnyAlternative (tokens: char list) = // We need a concrete type because Geneflect doesn't handle IComparable
             not (List.isEmpty tokens) ==>
-            let p = anyToken tokens
+            let p = any tokens
             tokens
             |> List.map (fun input -> d input p)             // The derivative wrt to any of the tokens will be some chain of Unions.
                                                              // All but one leaf parser will be Empty,
@@ -131,24 +131,24 @@ type ``Testing anyToken``() =
         Check.QuickThrowOnFailure nonEmptyAcceptsAnyAlternative
     [<Test>]
     member x.``with no tokens means Empty``() =
-        Assert.AreEqual(Empty, anyToken [])
+        Assert.AreEqual(Empty, any [])
     [<Test>]
     member x.``with single token means Char``() =
         let oneMeansChar (x: char) = // We need a concrete type because Geneflect doesn't handle IComparable
-            match anyToken [x] with
+            match any [x] with
             | Char y -> x = y
             | _      -> false
         Check.QuickThrowOnFailure oneMeansChar
 
 [<TestFixture>]
-type ``Testing allTokens``() =
+type ``Testing all``() =
     [<Test>]
     member x.``with no tokens means Empty``() =
-        Assert.AreEqual(Empty, allTokens [])
+        Assert.AreEqual(Empty, all [])
     [<Test>]
     member x.``with one token means Char``() =
         let oneMeansChar (x: char) = // We need a concrete type because Geneflect doesn't handle IComparable
-            match allTokens [x] with
+            match all [x] with
             | Char y -> x = y
             | _      -> false
         Check.QuickThrowOnFailure oneMeansChar
@@ -156,6 +156,5 @@ type ``Testing allTokens``() =
     member x.``with multiple tokens means Cat``() =
         let manyMeansCat (xs: char list) =
             not (List.isEmpty xs) ==>
-            matches (allTokens xs) xs
+            matches (all xs) xs
         Check.QuickThrowOnFailure manyMeansCat
-
