@@ -44,8 +44,15 @@
   </PropertyGroup>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
-    <Compile Include="RegexTests.fs" />
     <None Include="packages.config" />
+    <Compile Include="TestExtensions.fs" />
+    <Compile Include="RegexTests.fs" />
+    <Compile Include="RegexCompactingTest.fs" />
+    <Compile Include="RegexDerivingTest.fs" />
+    <Compile Include="RegexEmptinessTest.fs" />
+    <Compile Include="RegexNullabilityTest.fs" />
+    <Compile Include="RegexParseTrees.fs" />
+    <Compile Include="RegexSeqExtensionsTest.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FsCheck">
