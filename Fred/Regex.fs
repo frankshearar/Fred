@@ -344,4 +344,4 @@ module Regex =
         match tokens with
         | []    -> Empty
         | [x]   -> Char x
-        | x::xs -> Cat (Char x, (allTokens xs))
+        | x::xs -> Cat (Char x, all xs)
