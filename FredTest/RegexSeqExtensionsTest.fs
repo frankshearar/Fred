@@ -61,12 +61,32 @@ type ``Interleaving of Seqs``() =
 [<TestFixture>]
 type ``Taking the product of Seqs``() =
     [<Test>]
-    member x.``returns all combinations of all elements of both sequences``() =
+    member x.``when both are empty, is Seq.empty``() =
+        Assert.AreEqual(Seq.empty, (allPairs Seq.empty Seq.empty (+)))
+    [<Test>]
+    member x.``when first is empty, is the second``() =
+        Assert.AreEqual([1;2;3], (allPairs Seq.empty [1;2;3] (+)))
+    [<Test>]
+    member x.``when second is empty, is the first``() =
+        Assert.AreEqual([1;2;3], (allPairs [1;2;3] Seq.empty (+)))
+    [<Test>]
+    member x.``returns all combinations of all elements of both non-empty sequences``() =
         let cartesianProductHasExpectedLength listA listB = // Geneflect can't generate seqs, so take lists instead.
+            (not (List.isEmpty listA) && not (List.isEmpty listB)) ==>
             let seqA = listA |> Seq.ofList
             let seqB = listB |> Seq.ofList
             Seq.length (allPairs seqA seqB (fun x y -> 0)) = (Seq.length seqA) * (Seq.length seqB)
         Check.QuickThrowOnFailure cartesianProductHasExpectedLength
+    [<Test>]
+    member x.``returns the non-empty sequence when the other sequence is empty``() =
+        listEqual [1;2;3] (allPairs [1;2;3] [] (+))
+        listEqual [1;2;3] (allPairs [] [1;2;3] (+))
+//        let cartProdIsNonEmptySeq listA listB =
+//            (List.isEmpty listA || List.isEmpty listB) ==>
+//                let seqA = listA |> Seq.ofList
+//                let seqB = listB |> Seq.ofList
+//                Seq.length (allPairs seqA seqB List.append) = (Seq.length seqA) + (Seq.length seqB) // empty = 0 length = additive identity
+//        Check.QuickThrowOnFailure cartProdIsNonEmptySeq
     [<Test>]
     member x.``runs the function on all pairs``() =
         let functionApplied (listA: int list) listB =
