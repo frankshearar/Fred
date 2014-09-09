@@ -41,3 +41,6 @@ type ``Building parse trees``() =
             |> Seq.map (fun parse -> List.exists (fun each -> each = parse) catParses)
             |> Seq.fold (&&) true
         Check.QuickThrowOnFailure parsesIncludesFirstParsesThenEps
+    [<Test>]
+    member x.``from Cat should yield concatenated parses even if second parser has none``() =
+        Assert.AreEqual(set [['a']], (parseNull (Cat (Eps' (set [['a']]),Star (Char 'a')))))

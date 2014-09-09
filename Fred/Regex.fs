@@ -53,12 +53,14 @@ module Regex =
     // that function to every pair of values in the sequences.
     // Think of Scheme's for/set.
     let allPairs xs ys f =
-        let constantly v _ = v
-        let left = xs
-        let right = ys
-        seq { for x in left do
-                for y in right do
-                    yield f x y}
+        match Seq.isEmpty xs, Seq.isEmpty ys with
+        | true, true -> Seq.empty
+        | true, false -> ys
+        | false, true -> xs
+        | false, false -> seq {
+                               for x in xs do
+                                   for y in ys do
+                                       yield f x y}
 
     // Use parseNull to retrieve all possible parses of the input thus far.
     let rec parseNull (p: Parser<'a>): Set<'a list> =
@@ -71,7 +73,7 @@ module Regex =
         | Union (a,b) -> Set.union (parseNull a) (parseNull b)
         | Cat (a, b)  -> let prefix = parseNull a
                          let suffix = parseNull b
-                         allPairs prefix suffix (fun x y -> List.append x y)
+                         allPairs prefix suffix List.append
                          |> Seq.map List.ofSeq
                          |> Set.ofSeq
         | Star a -> parseNull a
@@ -141,8 +143,7 @@ module Regex =
                               | true, true
                               | true, false
                               | false, true  -> yield! Seq.empty
-                              | false, false -> yield! (allPairs seqA seqB (fun a b -> List.append a b))
-                            }
+                              | false, false -> yield! (allPairs seqA seqB (fun a b -> List.append a b)) }
         | Star a      -> seq {
                               yield! gen (Eps' (Set.singleton []))
                               yield! gen a } // <-- This is wrong. See the generate-kleene-star-languages branch for explorations in fixing the bug.
@@ -345,3 +346,33 @@ module Regex =
         | []    -> Empty
         | [x]   -> Char x
         | x::xs -> Cat (Char x, all xs)
+
+    // find finds all matches in some list.
+    // At each step, find
+    // * adds the original parser to the list of running parsers,
+    // * derives all currently running parsers with respect to the next element,
+    // * culls Empty parsers,
+    // * collects the parse trees of any parsers.
+    let find p s: 'a list seq =
+        let reject predicate l = List.filter (fun x -> not (predicate x)) l
+        // TODO: but we want to record our position in the stream, which means we
+        // must throw away the idea of walking over a naked list: we need to count characters
+        // and such!
+        let rec find' baseParser parsers (parses: 'a list seq) input =
+            match input with
+            | []    -> parses
+            | x::xs -> let newParsers = baseParser::parsers
+                                        |> List.map (fun p -> dP x p)
+                                        |> List.map compact
+                                        |> reject empty
+                       let newParses = newParsers
+                                       |> List.filter nullable // Only handle parsers with complete parses
+                                       |> List.map parseNull   // Gather all parses
+                                       |> List.map Set.toList  // Into one big list
+                                       |> List.concat
+                                       |> List.toSeq
+                                       |> Seq.append parses    // And add the new parses to the pile.
+                                                               // Don't dedupe here, because duplicate parses
+                                                               // will start from a new point in the input!
+                       find' baseParser newParsers newParses xs
+        find' p [] Seq.empty s

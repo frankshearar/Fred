@@ -158,3 +158,40 @@ type ``Testing all``() =
             not (List.isEmpty xs) ==>
             matches (all xs) xs
         Check.QuickThrowOnFailure manyMeansCat
+
+[<TestFixture>]
+type ``Test find``() =
+    [<Test>]
+    member x.``with no input returns no results, regardless of parser``() =
+        let neverAnyResultsForNoInput (p: Parser<char>) =
+            let matches = find p [] |> List.ofSeq
+            listEqual [] matches
+        Check.QuickThrowOnFailure neverAnyResultsForNoInput
+    [<Test>]
+    member x.``with input, never returns an empty match``() =
+        let neverReturnAnEmpty (p: Parser<char>) (input: char list) =
+            not (List.isEmpty input) ==>
+            let matches = find p input |> List.ofSeq
+            None = List.tryFind List.isEmpty matches
+        Check.QuickThrowOnFailure neverReturnAnEmpty
+    [<Test>]
+    member x.``can find a single match``() =
+        let hit = ['a';'b';'c']
+        let matches = find (all hit) ['a'..'z'] |> List.ofSeq
+        listEqual [hit] matches
+    [<Test>]
+    member x.``can return multiple matches``() =
+        let hit = ['a';'b';'c']
+        let matches = find (all hit) (['a'..'z']@['a'..'z']) |> List.ofSeq
+        listEqual [hit;hit] matches
+    [<Test>]
+    member x.``can find single-char matches at the start of input``() =
+        let matches = find (Char 'a') ("abababababbaabbbabbababa" |> List.ofSeq) |> List.ofSeq
+        listEqual ['a'] (List.head matches)
+        Assert.AreEqual(11, List.length matches)
+    [<Test>]
+    member x.``can find overlapping matches``() =
+        let hit = ['a'; 'b'; 'a']
+        let matches = find (all hit) ("abababababbaabbbabbababa" |> List.ofSeq) |> List.ofSeq
+        listEqual hit (List.head matches)
+        Assert.AreEqual(6, List.length matches)
