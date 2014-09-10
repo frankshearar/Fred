@@ -5,6 +5,7 @@
 // Counts a la {3} {2,4} {2,}
 // Character classes
 // Reduction parsers apply a function to a match.
+// Wildcard - a parser that accepts any single token. Looks a lot like Char, turns into an Eps/Eps' on derivation.
 // Negation
 // Active patterns for empty/nullable parsers
 // Check against the rules in http://plastic-idolatry.com/erik/oslo2014.pdf Investigate application of derivatives to other *-semirings
