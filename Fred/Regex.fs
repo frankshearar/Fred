@@ -67,7 +67,6 @@ module Regex =
 
     // Use parseNull to retrieve all possible parses of the input thus far.
     let rec parseNull (p: Parser<'a>): Set<'a list> =
-        let uniq l = l |> Seq.ofList |> Seq.distinct |> List.ofSeq
         match p with
         | Empty
         | Eps
