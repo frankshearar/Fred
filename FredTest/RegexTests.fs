@@ -1,4 +1,4 @@
-﻿module RegexTests
+﻿module Regex.Test.Matching
 
 open Fred
 open FsCheck
@@ -70,50 +70,6 @@ type ``Matching``() =
     member x.``Star doesn't match unexpected input``() =
         let star = Star (Char 'a')
         Assert.False(matches star ['b'])
-    [<Test>]
-    member x.``Parsing empty string with an Eps gives no matches``() =
-        Assert.AreEqual([], (findMatches Eps ""))
-    [<Test>]
-    member x.``Parsing empty string with an Eps [] gives no matches``() =
-        Assert.AreEqual([], (findMatches (Eps' (set [[]])) ""))
-    [<Test>]
-    member x.``Parsing empty string with any parser gives no matches``() =
-        Assert.AreEqual([], (findMatches (Char 'a') ""))
-    [<Test>]
-    member x.``Char parser can find matches``() =
-        listEqual ["a"] (findMatches (Char 'a') "a")
-        listEqual ["a"] (findMatches (Char 'a') "ba")
-        listEqual ["a"] (findMatches (Char 'a') "bab")
-    [<Test>]
-    member x.``findMatches``() =
-        listEqual [] (findMatches (Char 'a') "")
-        listEqual ["a"] (findMatches (Char 'a') "a")
-        listEqual ["a"; "a"; "a"; "a"] (findMatches (Char 'a') "aabbbbaa")
-        listEqual ["ab"] (findMatches (Cat (Char 'a', Char 'b')) "ab")
-        listEqual ["ab"] (findMatches (Cat (Char 'a', Char 'b')) "aabbbbaa")
-        listEqual ["ab"; "ab"; "ab"] (findMatches (Cat (Char 'a', Char 'b')) "aabbbbaabbab")
-        listEqual ["a"; "a"; "b"; "a"; "a"; "a"] (findMatches (Union (Char 'a', Char 'b')) "aabaaa")
-        listEqual ["aa"; "aaa"] (findMatches (Star (Char 'a')) "aabaaa") // aka "Star is greedy"
-    [<Test>]
-    member x.``findSubMatch``() =
-        let equal2 (a: obj * obj) b =
-            match a,b with
-            | (a1, a2), (b1, b2) ->
-                listEqual a1 b1
-                listEqual a2 b2
-        equal2 ([],[])    (findSubMatch Empty (List.ofSeq ""))
-        equal2 ([],['a']) (findSubMatch Empty (List.ofSeq "a"))
-        equal2 ([],[])    (findSubMatch Eps (List.ofSeq ""))
-        equal2 ([],['a']) (findSubMatch Eps (List.ofSeq "a"))
-        equal2 ([],[])    (findSubMatch (Eps' (set [[]])) (List.ofSeq ""))
-        equal2 ([],['a']) (findSubMatch (Eps' (set [[]])) (List.ofSeq "a"))
-        equal2 ([], ['a'; 'a']) (findSubMatch (Cat (Char 'a', Char 'b')) (List.ofSeq "aa"))
-    [<Test>]
-    member x.``of a submatch loses no input``() =
-        let noInputLost (p: Parser<int>) inputList =
-            let matchedPrefix, remainder = findSubMatch p inputList
-            (List.append matchedPrefix remainder) = inputList
-        Check.QuickThrowOnFailure noInputLost
 
 [<TestFixture>]
 type ``Testing any``() =

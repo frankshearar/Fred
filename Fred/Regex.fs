@@ -238,54 +238,6 @@ module Regex =
         List.ofSeq s
         |> matches p
 
-    // findSubMatch finds the prefix of some input that matches a parser. It returns
-    // the matching prefix, and the remainder of the input.
-    // Current Star parsers don't return the correct results because they match _parsimoniously_.
-    // They need to match _greedily_.
-    let findSubMatch p input =
-        let rec find subParser partialMatch xs =
-            match subParser, xs with
-            | Star rep, _ ->
-                let mutable remainder = xs
-                let mutable entireMatch = partialMatch
-                let mutable finished = false
-                while not finished do
-                    let newMatch, dregs = find rep [] remainder
-                    if not (List.isEmpty newMatch) then
-                        // No match: end of the line for this match attempt
-                        remainder <- dregs
-                        entireMatch <- List.append entireMatch newMatch
-                    finished <- (List.isEmpty newMatch) || (List.isEmpty remainder)
-                entireMatch, remainder
-            | _, _ when nullable subParser -> partialMatch, xs // New match
-            | _, _ when empty subParser -> [], xs
-            | _, [] -> [], []
-            | _, x::rest -> let newMatches, dregs = find (d x subParser) (x::partialMatch) rest
-                            newMatches, dregs
-        // If we found no match, return the actual remaining input... which is the remaining input.
-        match find p [] input with
-        | [], r -> [], input
-        | m, r -> m, r
-
-    // findMatches returns a list of _all_ matches that a parser finds in the input.
-    // It attempts to find a prefix match - a match on the first items in the input - and, if
-    // that fails, moves one item along the input. Crude, inefficient, but it works.
-    let findMatches p s =
-        let toString chars =
-            List.fold (fun (sb: StringBuilder) (c: char) -> sb.Append(c)) (new StringBuilder()) chars
-            |> string
-        let mutable remainder = (List.ofSeq s)
-        let mutable matches = []
-        while not (List.isEmpty remainder) do
-            let newMatch, rest = findSubMatch p remainder
-            remainder <- match newMatch with
-                         | [] -> List.tail remainder // No match? Move one item along.
-                         | _  -> rest
-            matches   <- match newMatch with
-                         | []    -> matches
-                         | x::xs -> newMatch::matches
-        List.map (fun x -> toString (List.rev x)) (List.rev matches)
-
     // dotify turns a Regex parser into a string in graphviz's DOT format.
     let dotify p =
         // We deliberately entangle walking the parser tree with printing
