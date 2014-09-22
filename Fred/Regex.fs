@@ -302,31 +302,58 @@ module Regex =
         | x::xs -> Cat (Char x, all xs)
 
     // find finds all matches in some list.
-    // At each step, find
+    // In essence, at each step, find
     // * adds the original parser to the list of running parsers,
     // * derives all currently running parsers with respect to the next element,
     // * culls Empty parsers,
-    // * collects the parse trees of any parsers.
+    // * collects the parse trees of any parsers
+    // * stores maximal-munches.
     let find p s: 'a list seq =
-        let reject predicate l = List.filter (fun x -> not (predicate x)) l
         // TODO: but we want to record our position in the stream, which means we
         // must throw away the idea of walking over a naked list: we need to count characters
         // and such!
         let rec find' baseParser parsers (parses: 'a list seq) input =
+            let rec star = function
+                | Empty | Eps | Eps' _ | Char _ -> false
+                | Star _ -> true
+                | Union (a, b) -> star a || star b
+                | Cat (a, b)   -> star a || star b
+            let reject predicate l = List.filter (fun x -> not (predicate x)) l
+            let gatherParses parsers =
+                parsers
+                |> List.filter nullable // Only handle parsers with complete parses
+                |> List.map parseNull   // Gather all parses
+                |> List.map Set.toList  // Into one big list
+                |> List.concat
+                |> List.toSeq
             match input with
-            | []    -> parses
-            | x::xs -> let newParsers = baseParser::parsers
+            | []    -> // There shouldn't be any empty parsers: see newParsers below.
+                       let finalParses = parsers
+                                         |> gatherParses
+                       Seq.append parses finalParses
+            | x::xs -> let endingParsers, rest = parsers
+                                                 |> reject empty
+                                                 |> List.partition (fun p -> dP x p |> empty)
+
+                       let newParsers = (match (star baseParser, rest) with
+                                        | true,  []    -> baseParser::rest
+                                        | false, []    -> baseParser::rest
+                                        | true,  p::ps -> rest // Just keep the old one ticking along.
+                                        | false, p::ps -> baseParser::rest)
                                         |> List.map (fun p -> dP x p)
                                         |> List.map compact
                                         |> reject empty
-                       let newParses = newParsers
-                                       |> List.filter nullable // Only handle parsers with complete parses
-                                       |> List.map parseNull   // Gather all parses
-                                       |> List.map Set.toList  // Into one big list
-                                       |> List.concat
-                                       |> List.toSeq
-                                       |> Seq.append parses    // And add the new parses to the pile.
-                                                               // Don't dedupe here, because duplicate parses
-                                                               // will start from a new point in the input!
+                       let maximalParses = endingParsers
+                                           |> List.map compact
+                                           |> gatherParses
+                                           |> Seq.append parses  // And add the new parses to the pile.
+                                                                 // Don't dedupe here, because duplicate parses
+                                                                 // will start from a new point in the input!
+                       let newParses = rest
+                                       |> reject star
+                                       |> gatherParses
+                                       |> Seq.append maximalParses
                        find' baseParser newParsers newParses xs
         find' p [] Seq.empty s
+
+    let findMatches p s = find p (List.ofSeq s)
