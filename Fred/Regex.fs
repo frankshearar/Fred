@@ -190,7 +190,7 @@ module Regex =
         postfixWalk (fun x -> x)
                     (fun parent childA childB ->
                                                  match parent with
-                                                 | Empty | Eps | Eps' _ | Char _ -> parent
+                                                 | Empty | Eps | Eps' _ | Char _ -> parent // Effectively a no-op
                                                  // TODO: Compact Cat (Eps' a, Eps' b) to something like Eps' (a@b)
                                                  // Easiest done with a Red parser.
                                                  | Cat _ -> match childA,childB with
