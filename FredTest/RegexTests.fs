@@ -131,6 +131,11 @@ type ``Test find``() =
             None = List.tryFind List.isEmpty matches
         Check.QuickThrowOnFailure neverReturnAnEmpty
     [<Test>]
+    member x.``can match entire input``() =
+        let hit = ['a';'b';'c']
+        let matches = find (all hit) hit |> List.ofSeq
+        listEqual [hit] matches
+    [<Test>]
     member x.``can find a single match``() =
         let hit = ['a';'b';'c']
         let matches = find (all hit) ['a'..'z'] |> List.ofSeq
@@ -151,3 +156,19 @@ type ``Test find``() =
         let matches = find (all hit) ("abababababbaabbbabbababa" |> List.ofSeq) |> List.ofSeq
         listEqual hit (List.head matches)
         Assert.AreEqual(6, List.length matches)
+    [<Test>]
+    member x.``with Char can find matches``() =
+        listEqual [['a']] ((find (Char 'a') ['a']) |> List.ofSeq)
+        listEqual [['a']] ((find (Char 'a') ['b';'a']) |> List.ofSeq)
+        listEqual [['a']] ((find (Char 'a') ['b';'a';'b']) |> List.ofSeq)
+    [<Test>]
+    member x.``with Star can find greedy/maximal matches``() =
+        listEqual [['a';'a']] ((find (Star (Char 'a')) ['a';'a';'b']) |> List.ofSeq)
+    [<Test>]
+    member x.``with Star can find trailing matches``() =
+        listEqual [['a';'a']] ((find (Star (Char 'a')) ['b';'a';'a']) |> List.ofSeq)
+    [<Test>]
+    member x.``Star doesn't match unexpected input``() =
+        let star = Star (Char 'a')
+        let matches = (find star ['b']) |> List.ofSeq
+        listEqual [] matches
