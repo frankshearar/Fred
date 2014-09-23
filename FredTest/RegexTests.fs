@@ -87,7 +87,7 @@ type ``Testing any``() =
         Check.QuickThrowOnFailure nonEmptyAcceptsAnyAlternative
     [<Test>]
     member x.``with no tokens means Empty``() =
-        Assert.AreEqual(Empty, any [])
+        parserEqual Empty (any [])
     [<Test>]
     member x.``with single token means Char``() =
         let oneMeansChar (x: char) = // We need a concrete type because Geneflect doesn't handle IComparable
@@ -100,7 +100,7 @@ type ``Testing any``() =
 type ``Testing all``() =
     [<Test>]
     member x.``with no tokens means Empty``() =
-        Assert.AreEqual(Empty, all [])
+        parserEqual Empty (all [])
     [<Test>]
     member x.``with one token means Char``() =
         let oneMeansChar (x: char) = // We need a concrete type because Geneflect doesn't handle IComparable
