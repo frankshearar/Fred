@@ -14,7 +14,6 @@
 // Operator overloading? + -> Union, * -> Cat, ... ?
 // Pull out the *-semiring interface, and generalise the derivative to work on *-semirings.
 // Optimise empty and nullable by using fixpoints and caching, because they're used all over the place
-// C#-friendly wrapper
 //
 // SOUNDS GREAT BUT:
 // Unions across more than 2 options:
