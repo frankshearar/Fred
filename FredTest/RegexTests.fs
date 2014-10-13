@@ -172,3 +172,20 @@ type ``Test find``() =
         let star = Star (Char 'a')
         let matches = (find star ['b']) |> List.ofSeq
         listEqual [] matches
+[<TestFixture>]
+type ``Resumable find``() =
+    [<Test>]
+    member x.``can pause parsing``() =
+        let baseParser, parsers, parses = resumableFind ((all ['a';'b']), [], []) "ab"
+        let partialParses =
+            finishFind parsers parses
+            |> List.ofSeq
+        listEqual [['a';'b']] partialParses
+    [<Test>]
+    member x.``can resume parsing``() =
+        let baseParser, parsers, finalParses = resumableFind ((all ['a';'b']), [], []) "ab"
+        let _, nowParsers, nowParses = resumableFind(baseParser,parsers,finalParses) "ab"
+        let completedParses =
+            finishFind nowParsers nowParses
+            |> List.ofSeq
+        listEqual [['a';'b'];['a';'b']]  completedParses
