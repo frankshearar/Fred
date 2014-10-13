@@ -3,7 +3,6 @@
 // TODO:
 // Short-hand string so you can say /[a-z]+/ or whatever <-- ?? see puffnfresh's comments about "improve regex by removing stringly typing & parsing"
 // Rewrite find to use a seq, not a list (because we want to process input lazily!)
-// Support the "slow socket" use case: add a find-like function to handle incomplete input while preserving state.
 // Counts a la {3} {2,4} {2,}
 // Character classes
 // Reduction parsers apply a function to a match.
@@ -301,6 +300,72 @@ module Regex =
         | [x]   -> Char x
         | x::xs -> Cat (Char x, all xs)
 
+    // ParsePosition tracks our progress in parsing: it stores the original parser,
+    // the parsers we have derived thus far, and the parse trees of those parsers.
+    type ParsePosition<'a when 'a: comparison> = Parser<'a> * Parser<'a> list * 'a list seq
+
+    // gatherParses returns all parse trees for _completed_ parses, i.e.,
+    // parsers that can process an empty input. It returns unique parses.
+    let gatherParses parsers =
+        parsers
+        |> List.filter nullable // Only handle parsers with complete parses
+        |> List.map parseNull   // Gather all parses
+        |> List.map Set.toList  // Into one big list
+        |> List.concat          // Glom them together
+        |> List.toSeq           // And spit out a lazy list
+
+    // finishFind finishes off a resumable find: now that you have no more
+    // input, what are the final parse trees?
+    // parses contains any complete parses found thus far; parses contains
+    // any remaining complete parses.
+    let finishFind parsers parses =
+        parsers
+        |> gatherParses
+        |> Seq.append parses
+
+    // resumableFind lets you pause parsing while you wait for more input.
+    let rec resumableFind (parsePosition: ParsePosition<'a>) input: ParsePosition<'a> =
+        let (baseParser, parsers, parses) = parsePosition
+        // Star parsers need to "munch maximally", matching against as much
+        // input as they can. Thus we need to find such parsers. Any parser
+        // that contains a Star may munch maximally.
+        let rec star = function
+            | Empty | Eps | Eps' _ | Char _ -> false
+            | Star _ -> true
+            | Union (a, b) -> star a || star b
+            | Cat (a, b)   -> star a || star b
+        let reject predicate l = List.filter (fun x -> not (predicate x)) l
+        if (Seq.isEmpty input) then
+            // If there's no more input, _do nothing_. Either the entire
+            // input has been processed, or we have exhausted the input
+            // temporarily. Return the current parse state.
+            baseParser, parsers, parses
+        else
+            let x = Seq.head input
+            let xs = Seq.skip 1 input
+            let endingParsers, rest = parsers
+                                        |> reject empty
+                                        |> List.partition (fun p -> dP x p |> empty)
+            let newParsers = (match (star baseParser, rest) with
+                                | true,  []    -> baseParser::rest
+                                | false, []    -> baseParser::rest
+                                | true,  p::ps -> rest // Just keep the old one ticking along.
+                                | false, p::ps -> baseParser::rest)
+                                |> List.map (fun p -> dP x p)
+                                |> List.map compact
+                                |> reject empty
+            let maximalParses = endingParsers
+                                |> List.map compact
+                                |> gatherParses
+                                |> Seq.append parses    // And add the new parses to the pile.
+                                                        // Don't dedupe here, because duplicate parses
+                                                        // will start from a new point in the input!
+            let newParses = rest
+                            |> reject star
+                            |> gatherParses
+                            |> Seq.append maximalParses
+            resumableFind (baseParser, newParsers, newParses) xs
+
     // find finds all matches in some list.
     // In essence, at each step, find
     // * adds the original parser to the list of running parsers,
@@ -308,52 +373,11 @@ module Regex =
     // * culls Empty parsers,
     // * collects the parse trees of any parsers
     // * stores maximal-munches.
-    let find p s: 'a list seq =
+    let find p (s: 'a seq): 'a list seq =
         // TODO: but we want to record our position in the stream, which means we
         // must throw away the idea of walking over a naked list: we need to count characters
         // and such!
-        let rec find' baseParser parsers (parses: 'a list seq) input =
-            let rec star = function
-                | Empty | Eps | Eps' _ | Char _ -> false
-                | Star _ -> true
-                | Union (a, b) -> star a || star b
-                | Cat (a, b)   -> star a || star b
-            let reject predicate l = List.filter (fun x -> not (predicate x)) l
-            let gatherParses parsers =
-                parsers
-                |> List.filter nullable // Only handle parsers with complete parses
-                |> List.map parseNull   // Gather all parses
-                |> List.map Set.toList  // Into one big list
-                |> List.concat
-                |> List.toSeq
-            match input with
-            | []    -> // There shouldn't be any empty parsers: see newParsers below.
-                       let finalParses = parsers
-                                         |> gatherParses
-                       Seq.append parses finalParses
-            | x::xs -> let endingParsers, rest = parsers
-                                                 |> reject empty
-                                                 |> List.partition (fun p -> dP x p |> empty)
-
-                       let newParsers = (match (star baseParser, rest) with
-                                        | true,  []    -> baseParser::rest
-                                        | false, []    -> baseParser::rest
-                                        | true,  p::ps -> rest // Just keep the old one ticking along.
-                                        | false, p::ps -> baseParser::rest)
-                                        |> List.map (fun p -> dP x p)
-                                        |> List.map compact
-                                        |> reject empty
-                       let maximalParses = endingParsers
-                                           |> List.map compact
-                                           |> gatherParses
-                                           |> Seq.append parses  // And add the new parses to the pile.
-                                                                 // Don't dedupe here, because duplicate parses
-                                                                 // will start from a new point in the input!
-                       let newParses = rest
-                                       |> reject star
-                                       |> gatherParses
-                                       |> Seq.append maximalParses
-                       find' baseParser newParsers newParses xs
-        find' p [] Seq.empty s
+        let baseParser, parsers, parses = resumableFind (p, [], Seq.empty) s
+        finishFind parsers parses
 
     let findMatches p s = find p (List.ofSeq s)
