@@ -11,7 +11,6 @@ At the moment the project is not even alpha quality - it is primarily intended a
 
 TODO
 ----
-* Finding matches for a Star parser doesn't return the correct results.
 * Implement support for extended REs.
 * Implement/fix derivatives for context-free grammars
 
