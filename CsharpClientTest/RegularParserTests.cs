@@ -1,4 +1,6 @@
-﻿using Fred.RegularExpression;
+﻿using System;
+using System.Globalization;
+using Fred.RegularExpression;
 using NUnit.Framework;
 using System;
 using System.Linq;

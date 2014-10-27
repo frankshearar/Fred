@@ -41,3 +41,9 @@ type ``Nullability``() =
     [<Test>]
     member x.``Star is nullable if repeated parser is nullable``() =
         Assert.True(nullable (Star Eps))
+    [<Test>]
+    member x.``Not is nullable if subparser is not nullable``() =
+        Assert.True(nullable (Not Empty))
+    [<Test>]
+    member x.``Not is not nullable if subparser is nullable``() =
+        Assert.False(nullable (Not Eps))

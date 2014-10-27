@@ -3,7 +3,7 @@
 // TODO:
 // Short-hand string so you can say /[a-z]+/ or whatever <-- ?? see puffnfresh's comments about "improve regex by removing stringly typing & parsing"
 // Reduction parsers apply a function to a match.
-// Wildcard - a parser that accepts any single token. Looks a lot like Char, turns into an Eps/Eps' on derivation.
+// Wildcard - a parser that accepts any single token. Looks a lot like Char, turns into an Eps/Eps' on derivation. Possibly Not Eps ?
 // Negation
 // Active patterns for empty/nullable parsers
 // Check against the rules in http://plastic-idolatry.com/erik/oslo2014.pdf Investigate application of derivatives to other *-semirings
@@ -26,6 +26,28 @@ module Regex =
         | Union of Parser<'a> * Parser<'a>    // This or that
         | Cat of Parser<'a> * Parser<'a>      // This _then_ that
         | Star of Parser<'a>                  // Zero or more
+        | Not of Parser<'a>                   // Fail if subparser parses
+
+    // An ExtendedSet represents the idea of a set whose membership is made
+    // up of things definitely IN the set, and things definitely NOT in the
+    // set. Turning an ExtendedSet into a Set (through elementsOf) requires
+    // some base set, the universe of discourse.
+    type ExtendedSet<'a> when 'a: comparison =
+        | NormSet of Set<'a>
+        | NotSet of Set<'a>
+        static member union setA setB =
+            match setA,setB with
+            | NormSet a, NormSet b -> NormSet (Set.union a b)
+            | NotSet a, NotSet b   -> NotSet (Set.intersect a b)
+            | NormSet a, NotSet b  -> NotSet (NotSet )
+
+    let notSet = function
+        | NormSet s -> NotSet s
+        | NotSet s  -> NormSet s
+
+    let elementsOf universe = function
+        | NormSet s -> s
+        | NotSet s -> Set.difference universe s
 
     // nullable returns true if the parser has found a complete match: it has recognised a string.
     // Put another way, nullable returns true if the parser will recognise/accept the empty string.
@@ -37,6 +59,7 @@ module Regex =
         | Union (a, b) -> nullable a || nullable b
         | Cat (a, b)   -> nullable a && nullable b
         | Star a       -> true
+        | Not p        -> not (nullable p)
 
     // empty returns true if a parser has failed to recognise a string.
     let rec empty = function
@@ -47,6 +70,7 @@ module Regex =
         | Union (a, b) -> empty a && empty b
         | Cat (a, b)   -> empty a || empty b
         | Star p       -> false
+        | Not p        -> not (empty p)
 
     // Given two sequences and a function, return the result of applying
     // that function to every pair of values in the sequences.
@@ -62,19 +86,20 @@ module Regex =
                                        yield f x y}
 
     // Use parseNull to retrieve all possible parses of the input thus far.
-    let rec parseNull (p: Parser<'a>): Set<'a list> =
+    let rec parseNull universe (p: Parser<'a>): ExtendedSet<'a list> =
         match p with
         | Empty
         | Eps
-        | Char _  -> Set.empty
-        | Eps' t  -> t
-        | Union (a,b) -> Set.union (parseNull a) (parseNull b)
+        | Char _  -> NormSet Set.empty
+        | Eps' t  -> NormSet t
+        | Union (a,b) -> ExtendedSet.union (parseNull universe a) (parseNull universe b)
         | Cat (a, b)  -> let prefix = parseNull a
                          let suffix = parseNull b
                          allPairs prefix suffix List.append
                          |> Seq.map List.ofSeq
                          |> Set.ofSeq
-        | Star a -> parseNull a
+        | Star a -> parseNull universe a
+        | Not a -> notSet (parseNull universe a)
 
     // dP returns the derivative of a parser combinator with respect to the input token c.
     // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
@@ -95,6 +120,7 @@ module Regex =
                                            Cat (dP c a, b))
     | Cat (a, b)                 -> Cat (dP c a, b)
     | Star a                     -> Cat (dP c a, Star a)
+    | Not p                      -> Not (dP c p)
 
     // interleave returns a sequence that draws elements from each of the sequences in turn.
     // As each sequence empties, interleave forgets about the sequence.
@@ -145,6 +171,7 @@ module Regex =
         | Star a      -> seq {
                               yield! gen (Eps' (Set.singleton []))
                               yield! gen a } // <-- This is wrong. See the generate-kleene-star-languages branch for explorations in fixing the bug.
+        | Not a -> failwith "How the hell do we generate the language of a negated parser without a defined universal set of all possible sequences?!"
         Seq.distinct (gen p)
 
     // exactlyEqual returns true if the only value that sequence yields - and only once - is value.
@@ -174,6 +201,7 @@ module Regex =
         | Cat (a,b)   -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
         | Union (a,b) -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
         | Star a      -> merge p (postfixWalk f merge a) Empty // Stinky hack so that we only need one merge function, taking two children.
+        | Not a       -> merge p (postfixWalk f merge a) Empty // Stinky hack so that we only need one merge function, taking two children.
 
     // compact removes from a parser those subtrees that can no longer contribute to constructing parses.
     // We can remove Eps nodes, but not Eps' nodes. The latter contain partial parses, so removing them
@@ -204,7 +232,10 @@ module Regex =
                                                               | _            -> if childA = childB then childA else Union (childA, childB)
                                                  | Star _ -> match childA with // Note we ignore childB.
                                                              | Empty | Eps | Eps _ -> Eps
-                                                             | _ -> Star childA)
+                                                             | _ -> Star childA
+                                                 | Not _  -> match childA with // Note we ignore childB.
+                                                             | Empty | Eps | Eps _ -> Eps
+                                                             | _ -> Not childA)
 
     // d returns the derivative of a parser of a CFL with respect to the input token c.
     // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
@@ -218,6 +249,7 @@ module Regex =
     | Cat (a, b) when nullable a -> Union (d c b, Cat (d c a, b))
     | Cat (a, b)                 -> Cat (d c a, b)
     | Star a                     -> Cat (d c a, Star a)
+    | Not p                      -> Not (d c p)
 
     // matches returns true if a parser matches the entire input.
     let rec matches p = function
@@ -267,6 +299,10 @@ module Regex =
                 (dotify' b sb highest)
             | Star a ->
                 sb.AppendLine(sprintf "%A [label=\"Star\"]" nextNodeIdx) |> ignore
+                sb.AppendLine(sprintf "%A -> %A" nextNodeIdx (nextNodeIdx + 1)) |> ignore
+                dotify' a sb (nextNodeIdx + 1)
+            | Not a ->
+                sb.AppendLine(sprintf "%A [label=\"Not\"]" nextNodeIdx) |> ignore
                 sb.AppendLine(sprintf "%A -> %A" nextNodeIdx (nextNodeIdx + 1)) |> ignore
                 dotify' a sb (nextNodeIdx + 1)
         let sb = new StringBuilder()
@@ -338,10 +374,11 @@ module Regex =
 
     // gatherParses returns all parse trees for _completed_ parses, i.e.,
     // parsers that can process an empty input. It returns unique parses.
-    let gatherParses parsers =
+    let gatherParses parsers universe =
         parsers
         |> List.filter nullable // Only handle parsers with complete parses
         |> List.map parseNull   // Gather all parses
+        |> elementsOf universe
         |> List.map Set.toList  // Into one big list
         |> List.concat          // Glom them together
         |> List.toSeq           // And spit out a lazy list
@@ -360,6 +397,7 @@ module Regex =
         // that contains a Star may munch maximally.
         let rec star = function
             | Empty | Eps | Eps' _ | Char _ -> false
+            | Not p -> star p
             | Star _ -> true
             | Union (a, b) -> star a || star b
             | Cat (a, b)   -> star a || star b

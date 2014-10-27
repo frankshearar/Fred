@@ -44,3 +44,8 @@ type ``Building parse trees``() =
     [<Test>]
     member x.``from Cat should yield concatenated parses even if second parser has none``() =
         Assert.AreEqual(set [['a']], (parseNull (Cat (Eps' (set [['a']]),Star (Char 'a')))))
+    [<Test>]
+    member x.``Not is self-negating``() =
+        let notIsOwnInverse (p: Parser<char>) =
+            parseNull p = parseNull (Not (Not p))
+        Check.QuickThrowOnFailure notIsOwnInverse

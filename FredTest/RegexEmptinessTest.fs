@@ -49,3 +49,7 @@ type ``Emptiness``() =
         let nullableNeverEmpty (p: Parser<int>) = // The choice of int is arbitrary: any IComparable would do
             nullable p ==> not (empty p)
         Check.QuickThrowOnFailure nullableNeverEmpty
+    [<Test>]
+    member x.``Not parser is empty if subparser is not``() =
+        Assert.False(empty (Not Empty))
+        Assert.That(empty (Not Eps))

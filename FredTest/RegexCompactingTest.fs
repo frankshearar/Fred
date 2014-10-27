@@ -85,6 +85,9 @@ type ``Compacting``() =
     member x.``Eps then something nullable is that nullable subparser``() =
         parserEqual (Star (Char 'a')) ((compact (Cat (Eps, (Star (Char 'a'))))))
     [<Test>]
+    member x.``of a negated parser is the negated compacted subparser``() =
+        parserEqual (Not (Char 'a')) ((compact (Not (Cat (Eps, (Star (Char 'a')))))))
+    [<Test>]
     member x.``of a compacted parser is itself``() =
         let compactedParserIsCompact (p: Parser<int>) =
             let cp = compact p

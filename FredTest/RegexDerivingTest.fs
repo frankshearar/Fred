@@ -53,6 +53,11 @@ type ``Deriving``() =
         let dOfStarPeelsOffSubparser p (x: char) =
             Cat (d x p, Star p) = d x (Star p)
         Check.QuickThrowOnFailure dOfStarPeelsOffSubparser
+    [<Test>]
+    member x.``Not is not of derivative of subparser``() =
+        let notDistributesOverDerivation p (x: char) =
+            d x (Not p) = Not (d x p)
+        Check.QuickThrowOnFailure notDistributesOverDerivation
 
 // It's annoying having a separate test suite for d and dP. The two are
 // identical except for the derivative of Cat.
@@ -110,6 +115,11 @@ type ``Deriving parse trees``() =
         let dOfStarPeelsOffSubparser p (x: char) =
             Cat (dP x p, Star p) = dP x (Star p)
         Check.QuickThrowOnFailure dOfStarPeelsOffSubparser
+    [<Test>]
+    member x.``Not is not of derivative of subparser``() =
+        let notDistributesOverDerivation p (x: char) =
+            dP x (Not p) = Not (dP x p)
+        Check.QuickThrowOnFailure notDistributesOverDerivation
 // See the comment in dP's definition for why we can't yet uncomment this test
 //    [<Test>]
 //    member x.``Except for Char->Eps, both derivations are equal``() =
