@@ -70,6 +70,12 @@ type ``Matching``() =
     member x.``Star doesn't match unexpected input``() =
         let star = Star (Char 'a')
         Assert.False(matches star ['b'])
+    [<Test>]
+    member x.``matchSeq matches against seqs``() =
+        let star = Star (Char 'a')
+        Assert.That(matchSeq star (Seq.singleton 'a'))
+        Assert.That(matchSeq star (Seq.init 2 (fun _ -> 'a')))
+        Assert.That(matchSeq star (Seq.init 3 (fun _ -> 'a')))
 
 [<TestFixture>]
 type ``Testing any``() =
@@ -116,7 +122,111 @@ type ``Testing all``() =
         Check.QuickThrowOnFailure manyMeansCat
 
 [<TestFixture>]
-type ``Test find``() =
+type ``rep parser``() =
+    let threeAs = rep 3 (Char 'a')
+    [<Test>]
+    member x.``matches 0 repetitions of a parser through Eps``() =
+        parserEqual Eps (rep 0 (Char 'a'))
+    [<Test>]
+    member x.``matches 1 repetition of a parser through identity``() =
+        parserEqual (Char 'a') (rep 1 (Char 'a'))
+    [<Test>]
+    member x.``matches N repetitions of a parser``() =
+        Assert.That(matches threeAs (List.replicate 3 'a'))
+    [<Test>]
+    member x.``doesn't match N+M, M > 0, repetitions of a parser``() =
+        Assert.False(matches threeAs (List.replicate 2 'a'))
+    [<Test>]
+    member x.``doesn't match N+M, 0 < M < N, repetitions of a parser``() =
+        Assert.False(matches threeAs (List.replicate 4 'a'))
+
+[<TestFixture>]
+type ``atLeast parser``() =
+    let atLeastThreeAs = atLeast 3 (Char 'a')
+    [<Test>]
+    member x.``matches N repetitions of a parser``() =
+        Assert.That(matches atLeastThreeAs (List.replicate 3 'a'))
+    [<Test>]
+    member x.``matches N+M, M > 0, repetitions of a parser``() =
+        Assert.That(matches atLeastThreeAs (List.replicate 6 'a'))
+    [<Test>]
+    member x.``doesn't match N-M, 0 < M < N, repetitions of a parser``() =
+        Assert.False(matches atLeastThreeAs (List.replicate 2 'a'))
+    [<Test>]
+    member x.``requires a non-negative count``() =
+        Assert.Throws<System.ArgumentException>(fun () -> atLeast -1 (Char 'a') |> ignore)
+
+[<TestFixture>]
+type ``atMost parser``() =
+    let atMostThreeAs = atMost 3 (Char 'a')
+    [<Test>]
+    member x.``matches 0 repetitions of a parser``() =
+        Assert.That(matches atMostThreeAs [])
+    [<Test>]
+    member x.``matches N-M, 0 < M < N, repetitions of a parser``() =
+        Assert.That(matches atMostThreeAs (List.replicate 1 'a'))
+        Assert.That(matches atMostThreeAs (List.replicate 2 'a'))
+    [<Test>]
+    member x.``matches N repetitions of a parser``() =
+        Assert.That(matches atMostThreeAs (List.replicate 3 'a'))
+    [<Test>]
+    member x.``does not match N+M, M > 0, repetitions of a parser``() =
+        Assert.False(matches atMostThreeAs (List.replicate 4 'a'))
+
+[<TestFixture>]
+type ``alpha parser``() =
+    let alphabet = seq {
+                        yield! seq {'a' .. 'z'}
+                        yield! seq {'A' .. 'Z'}
+                        }
+    [<Test>]
+    member x.``accepts all English alphabet characters``() =
+        Assert.That(matches (Star alpha) (alphabet |> List.ofSeq))
+    [<Test>]
+    member x.``accepts no other input``() =
+        // Hardly an exhaustive list, but generating chars and filtering out the unacceptable
+        // chars is pretty expensive.
+        Assert.False(matches alpha ['0'])
+        Assert.False(matches alpha ['|'])
+        Assert.False(matches alpha ['é'])
+        Assert.False(matches alpha [' '])
+
+[<TestFixture>]
+type ``alphanum parser``() =
+    let alphabetOrDigit = seq {
+                        yield! seq {'a' .. 'z'}
+                        yield! seq {'A' .. 'Z'}
+                        yield! seq {'0' .. '9'}
+                        }
+    [<Test>]
+    member x.``accepts all English alphabet characters, and digits``() =
+        Assert.That(matches (Star alphanum) (alphabetOrDigit |> List.ofSeq))
+    [<Test>]
+    member x.``accepts no other input``() =
+        // Hardly an exhaustive list, but generating chars and filtering out the unacceptable
+        // chars is pretty expensive.
+        Assert.False(matches alpha ['|'])
+        Assert.False(matches alpha ['é'])
+        Assert.False(matches alpha [' '])
+
+[<TestFixture>]
+type ``num parser``() =
+    let digits = seq {'0' .. '9'}
+    [<Test>]
+    member x.``accepts all digit characters``() =
+        Assert.That(matches (Star num) (digits |> List.ofSeq))
+    [<Test>]
+    member x.``accepts no other input``() =
+        // Hardly an exhaustive list, but generating chars and filtering out the unacceptable
+        // chars is pretty expensive.
+        Assert.False(matches num ['a'])
+        Assert.False(matches num ['Z'])
+        Assert.False(matches num ['|'])
+        Assert.False(matches num ['é'])
+        Assert.False(matches num [' '])
+
+[<TestFixture>]
+type ``find function``() =
     [<Test>]
     member x.``with no input returns no results, regardless of parser``() =
         let neverAnyResultsForNoInput (p: Parser<char>) =
@@ -172,6 +282,13 @@ type ``Test find``() =
         let star = Star (Char 'a')
         let matches = (find star ['b']) |> List.ofSeq
         listEqual [] matches
+
+[<TestFixture>]
+type ``findMatches function``() =
+    [<Test>]
+    member x.``matches seqs``() =
+        seqEqual (Seq.singleton ['a']) ((findMatches (Char 'a') ['a']))
+
 [<TestFixture>]
 type ``Resumable find``() =
     [<Test>]

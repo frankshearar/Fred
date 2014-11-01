@@ -2,8 +2,6 @@
 
 // TODO:
 // Short-hand string so you can say /[a-z]+/ or whatever <-- ?? see puffnfresh's comments about "improve regex by removing stringly typing & parsing"
-// Counts a la {3} {2,4} {2,}
-// Character classes
 // Reduction parsers apply a function to a match.
 // Wildcard - a parser that accepts any single token. Looks a lot like Char, turns into an Eps/Eps' on derivation.
 // Negation
@@ -299,6 +297,36 @@ module Regex =
         | [x]   -> Char x
         | x::xs -> Cat (Char x, all xs)
 
+    // rep returns a parser that accepts count repetitions of any word in
+    // p's language.
+    let rec rep count p =
+        match count with
+        | 0 -> Eps
+        | 1 -> p
+        | n  -> Cat (p, rep (n - 1) p)
+
+    // atLeast returns a parser that accepts at least count number of repetitions
+    // of any word in p's language.
+    let atLeast count p =
+        match count with
+        | x when x < 0 -> invalidArg "count" "min >= 0"
+        | _            -> Cat (rep count p, Star p)
+
+    // reps returns a parser that accepts anywhere between min and max number
+    // of repetitions of any word in p's language.
+    let reps min max p =
+        match min,max with
+        | l,u when l < 0 -> invalidArg "min" "min >= 0"
+        | l,u when u < l -> invalidArg "max" "max >= min"
+        | l,u            -> seq { l..u }
+                            |> Seq.map (fun n -> rep n p)
+                            |> Seq.reduce (fun acc each -> Union (acc, each))
+
+    // atMost returns a parser that accepts any number (including zero) of repetitions
+    // of any word in p's language, up to some maximum amount.
+    let atMost count p =
+        reps 0 count p
+
     // ParsePosition tracks our progress in parsing: it stores the original parser,
     // the parsers we have derived thus far, and the parse trees of those parsers.
     type ParsePosition<'a when 'a: comparison> = Parser<'a> * Parser<'a> list * 'a list seq
@@ -346,10 +374,10 @@ module Regex =
                                         |> reject empty
                                         |> List.partition (fun p -> dP x p |> empty)
             let newParsers = (match (star baseParser, rest) with
-                                | true,  []    -> baseParser::rest
-                                | false, []    -> baseParser::rest
-                                | true,  p::ps -> rest // Just keep the old one ticking along.
-                                | false, p::ps -> baseParser::rest)
+                                | false, []
+                                | false, _::_
+                                | true,  [] -> baseParser::rest // Add a new parser for non-maximal munchers
+                                | true,  p::ps -> rest)         // Otherwise, just keep the old one ticking along.
                                 |> List.map (fun p -> dP x p)
                                 |> List.map compact
                                 |> reject empty
