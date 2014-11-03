@@ -154,7 +154,7 @@ type ``atLeast parser``() =
         Assert.False(matches atLeastThreeAs (List.replicate 2 'a'))
     [<Test>]
     member x.``requires a non-negative count``() =
-        Assert.Throws<System.ArgumentException>(fun () -> atLeast -1 (Char 'a') |> ignore)
+        Assert.Throws<System.ArgumentException>(fun () -> atLeast -1 (Char 'a') |> ignore) |> ignore
 
 [<TestFixture>]
 type ``atMost parser``() =
