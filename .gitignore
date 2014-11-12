@@ -6,6 +6,9 @@
 *.user
 *.sln.docstates
 
+# We generate AssemblyInfo.cs during the build process
+Fred/Properties/
+
 # Build results
 
 [Dd]ebug/
