@@ -46,7 +46,10 @@ namespace CsharpClientTest
         public void AtMostDoesntParseLotsOfReps(string input)
         {
             var p = RegularParser.Token('a').AtMost(2);
-            var matches = p.Match(input).ToList();
+            // Matches returns an list of IEnumerable<char>. Cast<>
+            // helps compiler realise that IEnumerable<char> is nearly
+            // equal to string.
+            var matches = p.Match(input).Select(chars => new string(chars.ToArray()));
             Assert.False(matches.Any(s => s == input));
         }
 
@@ -143,7 +146,8 @@ namespace CsharpClientTest
             var p = RegularParser.Token('a').Count(3);
             AssertDoesNotParse(p, "aa");
             AssertParses(p, "aaa");
-            Assert.That(p.Match("aaaa").All(s => s == "aaa"));
+            var matches = p.Match("aaaa").Select(chars => new string(chars.ToArray()));
+            Assert.That(matches.All(s => s == "aaa"));
         }
 
         [Test]
@@ -160,7 +164,8 @@ namespace CsharpClientTest
         {
             var p = RegularParser.Token('a').Count(3, 5);
             AssertDoesNotParse(p, "aa");
-            Assert.That(p.Match("aaaaaa").All(s => 3 <= s.Length && s.Length <= 5));
+            var matches = p.Match("aaaaaa");
+            Assert.That(matches.All(s => 3 <= s.Count() && s.Count() <= 5));
 
             AssertParses(p, "aaa");
             AssertParses(p, "aaaa");
@@ -196,12 +201,12 @@ namespace CsharpClientTest
             AssertDoesNotParse(p, "abcdefghij");
         }
 
-        private void AssertDoesNotParse(RegularParser p, string input)
+        private void AssertDoesNotParse(RegularParser<char> p, string input)
         {
             Assert.False(p.Recognise(input));
         }
 
-        private void AssertParses(RegularParser p, string input)
+        private void AssertParses(RegularParser<char> p, string input)
         {
             Assert.That(p.Recognise(input));
         }
