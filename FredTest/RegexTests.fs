@@ -210,6 +210,15 @@ type ``alphanum parser``() =
         Assert.False(matches alpha [' '])
 
 [<TestFixture>]
+type ``opt parser``() =
+    [<Test>]
+    member x.``accepts no input``() =
+        Assert.True(matches (opt alpha) [])
+    [<Test>]
+    member x.``accepts a word from the parser's language``() =
+        Assert.True(matches (opt alpha) ['a'])
+
+[<TestFixture>]
 type ``num parser``() =
     let digits = seq {'0' .. '9'}
     [<Test>]
