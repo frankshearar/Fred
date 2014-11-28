@@ -341,14 +341,8 @@ module Regex =
         |> List.concat          // Glom them together
         |> List.toSeq           // And spit out a lazy list
 
-    // finishFind finishes off a resumable find: now that you have no more
-    // input, what are the final parse trees?
-    // parses contains any complete parses found thus far; parses contains
-    // any remaining complete parses.
-    let finishFind parsers parses =
-        parsers
-        |> gatherParses
-        |> Seq.append parses
+    // startFind gives you an easy way to start matching over partial input.
+    let startFind parser: ParsePosition<'a> = parser, [], Seq.empty
 
     // resumableFind lets you pause parsing while you wait for more input.
     let rec resumableFind (parsePosition: ParsePosition<'a>) input: ParsePosition<'a> =
@@ -393,6 +387,16 @@ module Regex =
                             |> Seq.append maximalParses
             resumableFind (baseParser, newParsers, newParses) xs
 
+    // finishFind finishes off a resumable find: now that you have no more
+    // input, what are the final parse trees?
+    // parses contains any complete parses found thus far; parses contains
+    // any remaining complete parses.
+    let finishFind (parsePosition: ParsePosition<'a>) =
+        let _, parsers, parses = parsePosition
+        parsers
+        |> gatherParses
+        |> Seq.append parses
+
     // find finds all matches in some list.
     // In essence, at each step, find
     // * adds the original parser to the list of running parsers,
@@ -404,7 +408,7 @@ module Regex =
         // TODO: but we want to record our position in the stream, which means we
         // must throw away the idea of walking over a naked list: we need to count characters
         // and such!
-        let baseParser, parsers, parses = resumableFind (p, [], Seq.empty) s
-        finishFind parsers parses
+        resumableFind (p, [], Seq.empty) s
+        |> finishFind
 
     let findMatches p s = find p (List.ofSeq s)
