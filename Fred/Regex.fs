@@ -327,6 +327,10 @@ module Regex =
     let atMost count p =
         reps 0 count p
 
+    // opt returns a parser that accepts a word in some parser's language, or nothing.
+    // It's the ? operator in most regex languages.
+    let opt p = atMost 1 p
+
     // ParsePosition tracks our progress in parsing: it stores the original parser,
     // the parsers we have derived thus far, and the parse trees of those parsers.
     type ParsePosition<'a when 'a: comparison> = Parser<'a> * Parser<'a> list * 'a list seq
