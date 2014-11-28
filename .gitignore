@@ -36,3 +36,6 @@ _TeamCity*
 # Emacs temp files
 *~
 \#*#
+
+# NCrunch cache
+_NCrunch_Fred
