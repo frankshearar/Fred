@@ -33,7 +33,6 @@ In F#:
 rep 3 (Char 'a')    // or:
 (Char 'a') |> rep 3
 
-
 // /abc(d|e)/
 Cat (all ['a'; 'b'; 'c'], Union (Char 'd', Char 'e')) // or:
 Cat (all (List.ofSeq "abc"), Union (Char 'd', Char 'e')) // because a string is a sequence of char
