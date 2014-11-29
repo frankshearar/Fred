@@ -18,7 +18,8 @@ In C#:
 RegularParser.Token('a').Count(3)
 
 // /abc(d|e)/
-RegularParser.Token('a').Then(RegularParser.Token('b')).Then(RegularParser.Token('c')).Then(RegularParser.Token('d').Or(RegularParser.Token('e')))
+using P = Fred.RegularExpression.RegularParser;
+P.Token('a').Then(P.Token('b')).Then(P.Token('c')).Then(P.Token('d').Or(P.Token('e')))
 
 // /(ab)*/
 (RegularParser.Token('a').Then(RegularParser.Token('b')).Star()
@@ -30,18 +31,18 @@ RegularParser.Token('a').AtMost(1)
 In F#:
 ````fsharp
 // To find all strings "aaa" (or /a{3}/ if you prefer):
-rep 3 (Char 'a')    // or:
-(Char 'a') |> rep 3
+rep 3 (Char 'a')
 
 // /abc(d|e)/
-Cat (all ['a'; 'b'; 'c'], Union (Char 'd', Char 'e')) // or:
-Cat (all (List.ofSeq "abc"), Union (Char 'd', Char 'e')) // because a string is a sequence of char
+Cat (all ['a'; 'b'; 'c'], Union (Char 'd', Char 'e'))
+ // or, because a string is a sequence of char:
+Cat (all (List.ofSeq "abc"), Union (Char 'd', Char 'e'))
 
 // /(ab)*/
 (all (List.ofSeq "ab")) |> Star
 
 // /a?/
-Char 'a' |> atMost 1
+Char 'a' |> opt
 ````
 
 Finding things
