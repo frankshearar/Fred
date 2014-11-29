@@ -333,7 +333,10 @@ module Regex =
 
     // ParsePosition tracks our progress in parsing: it stores the original parser,
     // the parsers we have derived thus far, and the parse trees of those parsers.
-    type ParsePosition<'a when 'a: comparison> = Parser<'a> * Parser<'a> list * 'a list seq
+    type ParsePosition<'a when 'a: comparison> = {
+        Parser: Parser<'a>
+        CurrentParsers: Parser<'a> list
+        Parses: 'a list seq}
 
     // gatherParses returns all parse trees for _completed_ parses, i.e.,
     // parsers that can process an empty input. It returns unique parses.
@@ -346,11 +349,14 @@ module Regex =
         |> List.toSeq           // And spit out a lazy list
 
     // startFind gives you an easy way to start matching over partial input.
-    let startFind parser: ParsePosition<'a> = parser, [], Seq.empty
+    let startFind parser: ParsePosition<'a> =
+        {Parser = parser
+         CurrentParsers = []
+         Parses = Seq.empty}
 
     // resumableFind lets you pause parsing while you wait for more input.
     let rec resumableFind (parsePosition: ParsePosition<'a>) input: ParsePosition<'a> =
-        let (baseParser, parsers, parses) = parsePosition
+        let baseParser, parsers, parses = parsePosition.Parser, parsePosition.CurrentParsers, parsePosition.Parses
         // Star parsers need to "munch maximally", matching against as much
         // input as they can. Thus we need to find such parsers. Any parser
         // that contains a Star may munch maximally.
@@ -364,7 +370,9 @@ module Regex =
             // If there's no more input, _do nothing_. Either the entire
             // input has been processed, or we have exhausted the input
             // temporarily. Return the current parse state.
-            baseParser, parsers, parses
+            {Parser = baseParser
+             CurrentParsers = parsers
+             Parses = parses}
         else
             let x = Seq.head input
             let xs = Seq.skip 1 input
@@ -389,17 +397,16 @@ module Regex =
                             |> reject star
                             |> gatherParses
                             |> Seq.append maximalParses
-            resumableFind (baseParser, newParsers, newParses) xs
+            resumableFind {Parser = baseParser; CurrentParsers = newParsers; Parses = newParses} xs
 
     // finishFind finishes off a resumable find: now that you have no more
     // input, what are the final parse trees?
     // parses contains any complete parses found thus far; parses contains
     // any remaining complete parses.
     let finishFind (parsePosition: ParsePosition<'a>) =
-        let _, parsers, parses = parsePosition
-        parsers
+        parsePosition.CurrentParsers
         |> gatherParses
-        |> Seq.append parses
+        |> Seq.append parsePosition.Parses
 
     // find finds all matches in some list.
     // In essence, at each step, find
@@ -412,7 +419,7 @@ module Regex =
         // TODO: but we want to record our position in the stream, which means we
         // must throw away the idea of walking over a naked list: we need to count characters
         // and such!
-        resumableFind (p, [], Seq.empty) s
+        resumableFind (startFind p) s
         |> finishFind
 
     let findMatches p s = find p (List.ofSeq s)

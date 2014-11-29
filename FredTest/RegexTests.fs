@@ -302,16 +302,16 @@ type ``findMatches function``() =
 type ``Resumable find``() =
     [<Test>]
     member x.``can pause parsing``() =
-        let baseParser, parsers, parses = resumableFind (startFind (all ['a';'b'])) "ab"
+        let position = resumableFind (startFind (all ['a';'b'])) "ab"
         let partialParses =
-            finishFind (baseParser, parsers, parses)
+            finishFind position
             |> List.ofSeq
         listEqual [['a';'b']] partialParses
     [<Test>]
     member x.``can resume parsing``() =
-        let baseParser, parsers, finalParses = resumableFind (startFind (all ['a';'b'])) "ab"
-        let _, nowParsers, nowParses = resumableFind(baseParser,parsers,finalParses) "ab"
+        let pos1 = resumableFind (startFind (all ['a';'b'])) "ab"
+        let pos2 = resumableFind pos1 "ab"
         let completedParses =
-            finishFind (baseParser, nowParsers, nowParses)
+            finishFind pos2
             |> List.ofSeq
         listEqual [['a';'b'];['a';'b']]  completedParses
