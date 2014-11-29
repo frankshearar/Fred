@@ -47,10 +47,12 @@ Char 'a' |> atMost 1
 Finding things
 --------------
 
+In C#:
 ````csharp
 RegularParser.Num().Count(3,6).Recognise("123456")
 ````
 
+In F#:
 ````fsharp
 // In which we not only find stuff, we find stuff in partial input: useful for
 // handling slow/buffered input, like reading off a socket.
