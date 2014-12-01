@@ -224,9 +224,7 @@ module Regex =
         | []    -> nullable p
         | x::xs ->
             let deriv = (d x p)
-            let c = deriv//compact deriv
-//            printfn "d c p = %A" deriv
-//            printfn "compact = %A" c
+            let c = compact deriv
             matches c xs
 
     // matchSeq returns true if a parser matches the entire input seq. Useful for matching Strings.
