@@ -45,18 +45,3 @@ type RegularParser =
     static member Alpha with get() = new RegularParser<char>(alpha)
     static member AlphaNum with get() = new RegularParser<char>(alphanum)
     static member Num with get() = new RegularParser<char>(num)
-    member x.MatchString(s: System.String) =
-        // This complicated beast turns a String into
-        // Regex-friendly types, does the _one line of actual work_
-        // and then converts the output back to String.
-        let toString input =
-            let out = new StringBuilder()
-            input
-            |> Array.ofList
-            |> out.Append
-            |> ignore
-            out.ToString()
-        s.ToCharArray()
-        |> List.ofArray
-        |> find x.Parser
-        |> Seq.map (fun out -> toString out)
