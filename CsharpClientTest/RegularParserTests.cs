@@ -5,6 +5,20 @@ using System.Linq;
 
 namespace CsharpClientTest
 {
+    public static class It
+    {
+        public static void DoesNotParse(this RegularParser<char> p, string input)
+        {
+            Assert.False(p.Recognise(input));
+        }
+
+        public static void Parses(this RegularParser<char> p, string input)
+        {
+            Assert.That(p.Recognise(input));
+        }
+
+    }
+
     [TestFixture]
     public class RegularParserTests
     {
@@ -14,7 +28,7 @@ namespace CsharpClientTest
         public void AtLeastProcessesExcessRepetitions(string input)
         {
             var p = RegularParser.Token('a').AtLeast(2);
-            AssertParses(p, input);
+            p.Parses(input);
         }
 
         [TestCase("")]
@@ -22,7 +36,7 @@ namespace CsharpClientTest
         public void AtLeastRequiresInput(string input)
         {
             var p = RegularParser.Token('a').AtLeast(2);
-            AssertDoesNotParse(p, input);
+            p.DoesNotParse(input);
         }
 
         [Test]
@@ -37,7 +51,7 @@ namespace CsharpClientTest
         public void AtLeastWithZeroRepsActsLikeStar(string input)
         {
             var p = RegularParser.Token('a').AtLeast(0);
-            AssertParses(p, input);
+            p.Parses(input);
         }
 
 
@@ -58,7 +72,7 @@ namespace CsharpClientTest
         public void AtMostParsesLowerReps(string input)
         {
             var p = RegularParser.Token('a').AtMost(2);
-            AssertParses(p, input);
+            p.Parses(input);
         }
 
         [Test]
@@ -66,7 +80,7 @@ namespace CsharpClientTest
         {
             var p = RegularParser.Token('a').AtMost(2);
             Assert.IsEmpty(p.Match("").ToList());
-            AssertParses(p, "");
+            p.Parses("");
         }
 
         [Test]
@@ -144,8 +158,8 @@ namespace CsharpClientTest
         public void CountPermitsExactRepCount()
         {
             var p = RegularParser.Token('a').Count(3);
-            AssertDoesNotParse(p, "aa");
-            AssertParses(p, "aaa");
+            p.DoesNotParse("aa");
+            p.DoesNotParse("aaaa");
             var matches = p.Match("aaaa").Select(chars => new string(chars.ToArray()));
             Assert.That(matches.All(s => s == "aaa"));
         }
@@ -154,61 +168,65 @@ namespace CsharpClientTest
         public void CountWithMinEqualToMaxUsesMin()
         {
             var p = RegularParser.Token('a').Count(3,3);
-            AssertDoesNotParse(p, "aa");
-            AssertParses(p, "aaa");
-            AssertDoesNotParse(p, "aaaa");
+            p.DoesNotParse("aa");
+            p.Parses("aaa");
+            p.DoesNotParse("aaaa");
         }
 
         [Test]
         public void CountReturnsRepeatedParser()
         {
             var p = RegularParser.Token('a').Count(3, 5);
-            AssertDoesNotParse(p, "aa");
+            p.DoesNotParse("aa");
             var matches = p.Match("aaaaaa");
             Assert.That(matches.All(s => 3 <= s.Count() && s.Count() <= 5));
 
-            AssertParses(p, "aaa");
-            AssertParses(p, "aaaa");
-            AssertParses(p, "aaaaa");
-        }
-
-        [Test]
-        public void AlphaAcceptsEnglishCharacters()
-        {
-            var p = RegularParser.Alpha.Count(3);
-            AssertParses(p, "abc");
-            AssertParses(p, "xyz");
-
-            AssertDoesNotParse(p, "123");
+            p.Parses("aaa");
+            p.Parses("aaaa");
+            p.Parses("aaaaa");
         }
 
         [Test]
         public void ClassDefinesCharacterClass()
         {
             var p = RegularParser.Class("abc").Star();
-            AssertParses(p, "aaa");
-            AssertParses(p, "cba");
+            p.Parses("aaa");
+            p.Parses("cba");
 
-            AssertDoesNotParse(p, "xyz");
+            p.DoesNotParse("xyz");
+        }
+    }
+
+    [TestFixture]
+    public class CharRegularParserTests
+    {
+        [Test]
+        public void AlphaAcceptsEnglishCharacters()
+        {
+            var p = RegularParser.Alpha.Count(3);
+            p.Parses("abc");
+            p.Parses("xyz");
+
+            p.DoesNotParse("123");
+        }
+
+        [Test]
+        public void AlphaNumAcceptsEnglishCharactersAndDigits()
+        {
+            var p = RegularParser.AlphaNum.Count(3);
+            p.Parses("ab2");
+            p.Parses("x0z");
+
+            p.DoesNotParse("+++");
         }
 
         [Test]
         public void NumAcceptsDigits()
         {
             var p = RegularParser.Num.Count(10);
-            AssertParses(p, "0123456789");
+            p.Parses("0123456789");
 
-            AssertDoesNotParse(p, "abcdefghij");
-        }
-
-        private void AssertDoesNotParse(RegularParser<char> p, string input)
-        {
-            Assert.False(p.Recognise(input));
-        }
-
-        private void AssertParses(RegularParser<char> p, string input)
-        {
-            Assert.That(p.Recognise(input));
+            p.DoesNotParse("abcdefghij");
         }
     }
 }
