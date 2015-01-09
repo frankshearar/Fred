@@ -22,7 +22,7 @@
 module LOL =
     // Given two Length Ordered Lists a and b, a < b if a is shorter than b.
     [<CustomComparison>]
-    [<StructuralEquality>]
+    [<CustomEquality>]
     type LOL<'a> when 'a: comparison =
         | LOL of 'a list
         interface System.IComparable with
@@ -42,6 +42,10 @@ module LOL =
                 | :? LOL<'a> as ys ->
                     comp (unwrap x) (unwrap ys)
                 | _ -> -1
+        override x.Equals(obj: System.Object) =
+            (x :> System.IComparable).CompareTo(obj) = 0
+        override x.GetHashCode() =
+            match x with | LOL xs -> xs.GetHashCode()
 
     let append x y =
         match x, y with
