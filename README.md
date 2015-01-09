@@ -64,11 +64,18 @@ let someMoreProcessing = resumableFind someProcessedInput "abab"
 finishFind someMoreProcessing
 ````
 
+FURTHER READING
+---------------
+* [Brzozowski derivatives](http://en.wikipedia.org/wiki/Brzozowski_derivative)
+* McIlroy, [Enumerating the Strings of Regular Languages](http://www.cs.dartmouth.edu/~doug/nfa.ps.gz)
+* Owens, Reppy, & Turon, [Regular-expression derivatives reexamined](http://www.mpi-sws.org/~turon/re-deriv.pdf)
+
 TODO
 ----
 * Publish on NuGet
 * Implement support for extended REs.
 * Implement/fix derivatives for context-free grammars
+* Lazy operators
 
 [![Build status on .NET](https://ci.appveyor.com/api/projects/status/8ix7agowa8rrfu1k/branch/master)](https://ci.appveyor.com/project/frankshearar/fred/branch/master)
 [![Build Status on Mono](https://secure.travis-ci.org/frankshearar/Fred.png?branch=master)](http://travis-ci.org/frankshearar/Fred)

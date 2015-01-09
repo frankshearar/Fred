@@ -89,6 +89,8 @@ type ``Deriving parse trees``() =
         Check.QuickThrowOnFailure charDerivesToEmptyForNonMatch
     [<Test>]
     member x.``Cat with non-nullable first is derivative of first, followed by second``() =
+        // This test flickers in NCrunch because it can take longer than a minute to run,
+        // making NCrunch (with default timeouts) kill the test.
         let catWithNonNullablePrefix p1 p2 (x: char) =
             not (nullable p1) ==>
             (Cat (dP x p1, p2) = dP x (Cat (p1, p2)))

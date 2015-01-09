@@ -10,97 +10,75 @@ open Regex.Test.Extensions
 // Regex parsers are generic in their input type!
 
 [<TestFixture>]
-type ``Interleaving of Seqs``() =
+type ``Testing comp``() =
     [<Test>]
-    member x.``returns empty if both subseqs are empty``() =
-        listEqual [] (List.ofSeq (interleave [Seq.empty; Seq.empty]))
-    [<Test>]
-    member x.``returns left items if right subseq is empty``() =
-        interleave [Seq.ofList [1;2;3]; Seq.empty]
-        |> List.ofSeq
-        |> listEqual [1;2;3]
-    [<Test>]
-    member x.``returns right items if left subseq is empty``() =
-        interleave [Seq.empty; Seq.ofList [1;2;3]]
-        |> List.ofSeq
-        |> listEqual [1;2;3]
-    [<Test>]
-    member x.``returns from both seqs if neither are empty``() =
-        interleave [Seq.ofList [1;2;3]; Seq.ofList [4;5;6]]
-        |> List.ofSeq
-        |> listEqual [1;4;2;5;3;6]
-    [<Test>]
-    member x.``can use infinite sequences``() =
-        let constantly v _ = v
-        let numberCounts = interleave [Seq.initInfinite (constantly 1); Seq.initInfinite (constantly 2)]
-                           |> Seq.take 1000
-                           |> Seq.countBy (fun x -> x)
-                           |> List.ofSeq
-        listEqual [1,500;2,500] numberCounts
-
-    [<Test>]
-    member x.``handles empty sequences gracefully``() =
-        interleave [Seq.ofList [1;2;3]; Seq.empty; Seq.empty; Seq.ofList [4;5;6]]
-        |> List.ofSeq
-        |> listEqual [1;4;2;5;3;6]
-    [<Test>]
-    member x.``returns all elements of all sequences``() =
-        let allElemsReturned (lists: int list list) = // Why not int seq list? FsCheck chokes on generating seqs. See http://fscheck.codeplex.com/workitem/16785
-            let left =
-                lists
-                |> List.map Seq.ofList
-                |> interleave
-                |> Seq.length
-            let right =
-                lists
-                |> List.map List.length
-                |> List.fold (+) 0
-            left = right
-        Check.QuickThrowOnFailure allElemsReturned
+    member x.``with integer comparison works``() =
+        Assert.That(match 1, 2 with
+                    | LT -> true
+                    | _  -> false)
+        Assert.That(match 1, 1 with
+                    | EQ -> true
+                    | _  -> false)
+        Assert.That(match 2, 1 with
+                    | GT -> true
+                    | _  -> false)
 
 [<TestFixture>]
-type ``Taking the product of Seqs``() =
+type ``LOLs (length ordered lists)``() =
+    [<Test>]
+    member x.``are EQ if of same length (and heads of lists are EQ)``() =
+        Assert.AreEqual(0, (compare (LOL.over []) (LOL.over [])))
+        Assert.AreEqual(0, (compare (LOL.over [1]) (LOL.over [1])))
+        Assert.AreEqual(0, (compare (LOL.over [1;1]) (LOL.over [1;1])))
+    [<Test>]
+    member x.``are LT if shorter than another list``() =
+        Assert.AreEqual(-1, (compare [] [1]))
+    [<Test>]
+    member x.``are LT if first element of same length list is LT``() =
+        Assert.AreEqual(-1, (compare [0] [1]))
+    [<Test>]
+    member x.``are LT if first element of same length list is GT``() =
+        Assert.AreEqual(1, (compare [1] [0]))
+    [<Test>]
+    member x.``are GT if longer than another list``() =
+        Assert.AreEqual(1, (compare [1] []))
+
+[<TestFixture>]
+type ``Ordered merge``() =
+    [<Test>]
+    member x.``of two empty seqs is empty``() =
+        seqEqual Seq.empty (Seq.empty |/ Seq.empty)
+    [<Test>]
+    member x.``of empty with seq is seq``() =
+        let notEmpty = seq {yield 1; yield 2}
+        seqEqual notEmpty (Seq.empty |/ notEmpty)
+    [<Test>]
+    member x.``of seq with empty is seq``() =
+        let notEmpty = seq {yield 1; yield 2}
+        seqEqual notEmpty (notEmpty |/ Seq.empty)
+    [<Test>]
+    member x.``is ordered``() =
+        let a = seq {yield 0; yield 1; yield 3}
+        let b = seq {yield 1; yield 2}
+        seqEqual (seq { yield 0; yield 1; yield 2; yield 3}) (a |/ b)
+
+[<TestFixture>]
+type ``xprod (cross product of sequences)``() =
     [<Test>]
     member x.``when both are empty, is Seq.empty``() =
-        Assert.AreEqual(Seq.empty, (allPairs Seq.empty Seq.empty (+)))
+        Assert.AreEqual(Seq.empty, (xprod (+) Seq.empty Seq.empty))
     [<Test>]
-    member x.``when first is empty, is the second``() =
-        Assert.AreEqual([1;2;3], (allPairs Seq.empty [1;2;3] (+)))
+    member x.``when first is empty, is empty``() =
+        seqEqual Seq.empty (xprod (+) Seq.empty [1;2;3])
     [<Test>]
-    member x.``when second is empty, is the first``() =
-        Assert.AreEqual([1;2;3], (allPairs [1;2;3] Seq.empty (+)))
+    member x.``when second is empty, is empty``() =
+        seqEqual Seq.empty (xprod (+) [1;2;3] Seq.empty)
     [<Test>]
     member x.``returns all combinations of all elements of both non-empty sequences``() =
-        let cartesianProductHasExpectedLength listA listB = // Geneflect can't generate seqs, so take lists instead.
-            (not (List.isEmpty listA) && not (List.isEmpty listB)) ==>
-            let seqA = listA |> Seq.ofList
-            let seqB = listB |> Seq.ofList
-            Seq.length (allPairs seqA seqB (fun x y -> 0)) = (Seq.length seqA) * (Seq.length seqB)
-        Check.QuickThrowOnFailure cartesianProductHasExpectedLength
-    [<Test>]
-    member x.``returns the non-empty sequence when the other sequence is empty``() =
-        listEqual [1;2;3] (allPairs [1;2;3] [] (+))
-        listEqual [1;2;3] (allPairs [] [1;2;3] (+))
-//        let cartProdIsNonEmptySeq listA listB =
-//            (List.isEmpty listA || List.isEmpty listB) ==>
-//                let seqA = listA |> Seq.ofList
-//                let seqB = listB |> Seq.ofList
-//                Seq.length (allPairs seqA seqB List.append) = (Seq.length seqA) + (Seq.length seqB) // empty = 0 length = additive identity
-//        Check.QuickThrowOnFailure cartProdIsNonEmptySeq
+        listEqual [1,0; 0,0; 0,1; 1,1] (xprod (fun x y -> x,y) [1;0] [0;1] |> List.ofSeq)
     [<Test>]
     member x.``runs the function on all pairs``() =
-        let functionApplied (listA: int list) listB =
-            (not (List.isEmpty listA) && not (List.isEmpty listB)) ==>
-            let seqA = listA |> Seq.ofList
-            let seqB = listB |> Seq.ofList
-            let f = fun x y -> x + y
-            // After turning the lists into seqs we need to turn them BACK into lists so we can compare them value-wise.
-            let actual = allPairs seqA seqB f |> List.ofSeq
-            let expected = seq { for a in listA do
-                                     for b in listB do
-                                         yield f a b } |> List.ofSeq
-            expected = actual
-        Check.QuickThrowOnFailure functionApplied
+        listEqual [8;6;12;14] (xprod (+) [6;4] [2;8] |> List.ofSeq)
 
 [<TestFixture>]
 type ``Testing exactlyEqual``() =

@@ -16,6 +16,42 @@
 // * UnionN of list: 3x slower than folded Unions (for 5 elements)
 // * UnionN of array: 2x slower than folded Unions (for 5 elements)
 
+// A Length Ordered List wraps a List<'a> such that a shorter list is less
+// than a longer list, and lists of equal length are ordered by the compare
+// of their heads.
+module LOL =
+    // Given two Length Ordered Lists a and b, a < b if a is shorter than b.
+    [<CustomComparison>]
+    [<StructuralEquality>]
+    type LOL<'a> when 'a: comparison =
+        | LOL of 'a list
+        interface System.IComparable with
+            member x.CompareTo(obj: System.Object) =
+                // At this point we can't use the public unwrap!
+                // Using a private member looks even worse than this.
+                let unwrap lol = match lol with | LOL xs' -> xs'
+                let rec comp xs ys =
+                    // By construction, equal-length lists.
+                    match xs,ys with
+                    | [], []      -> 0
+                    | [],y::yt    -> -1
+                    | x::xt,[]    -> 1
+                    | x::xt,y::yt -> let comparedTails = comp xt yt
+                                     if comparedTails = 0 then compare x y else comparedTails
+                match obj with
+                | :? LOL<'a> as ys ->
+                    comp (unwrap x) (unwrap ys)
+                | _ -> -1
+
+    let append x y =
+        match x, y with
+        | LOL xs, LOL ys -> LOL (List.append xs ys)
+
+    let over xs = LOL xs
+
+    let unwrap = function
+        | LOL x -> x
+
 module Regex =
     open System.Text // For StringBuilder
     type Parser<'a> when 'a: comparison =     // "when 'a: comparison" because we use a Set to store parse trees.
@@ -26,6 +62,12 @@ module Regex =
         | Union of Parser<'a> * Parser<'a>    // This or that
         | Cat of Parser<'a> * Parser<'a>      // This _then_ that
         | Star of Parser<'a>                  // Zero or more
+
+    let (|LT|EQ|GT|) (a, b) =
+        match compare a b with
+        | 0 -> EQ
+        | n when n < 0 -> LT
+        | _ -> GT
 
     // nullable returns true if the parser has found a complete match: it has recognised a string.
     // Put another way, nullable returns true if the parser will recognise/accept the empty string.
@@ -48,18 +90,61 @@ module Regex =
         | Cat (a, b)   -> empty a || empty b
         | Star p       -> false
 
-    // Given two sequences and a function, return the result of applying
-    // that function to every pair of values in the sequences.
-    // Think of Scheme's for/set.
-    let allPairs xs ys f =
+    // |/ merges two ordered (according to the elements' compare) sequences
+    // such that resulting sequence is ordered (by the elements' compare).
+    // (I'd use (\/) like the original paper (McIlroy, Enumerating the Strings
+    // of Regular Languages), but no \s allowed!
+    let rec (|/) xs ys =
         match Seq.isEmpty xs, Seq.isEmpty ys with
         | true, true -> Seq.empty
         | true, false -> ys
         | false, true -> xs
-        | false, false -> seq {
-                               for x in xs do
-                                   for y in ys do
-                                       yield f x y}
+        | false, false ->
+            // Pulling out the tails in let bindings looks neater,
+            // but means we throw one of those tails away every
+            // time the comparison of heads is not EQ. |/ is used
+            // A LOT, so let's be efficient with some loss of beauty.
+            let x = Seq.head xs
+            let y = Seq.head ys
+            match x, y with
+            | LT -> seq { yield x; yield! (Seq.skip 1 xs) |/ ys              }
+            | EQ -> seq { yield x; yield! (Seq.skip 1 xs) |/ (Seq.skip 1 ys) }
+            | GT -> seq { yield y; yield!              xs |/ (Seq.skip 1 ys) }
+
+    // Given two sequences and a function, xprod returns the result of applying
+    // that function to every pair of values in the sequences.
+    // It returns values in the order defined by the elements' CompareTo.
+    let rec xprod f xs ys =
+        match Seq.isEmpty xs, Seq.isEmpty ys with
+        | true,  true
+        | false, true
+        | true,  false -> Seq.empty
+        | false, false ->
+            // Pulling out the tails in let bindings looks neater,
+            // but since we use xprod A LOT, let's defer the creation
+            // of those tails right until just before we need them.
+            let x = Seq.head xs
+            let y = Seq.head ys
+            seq {
+                 yield f x y
+                 yield! xprod f (Seq.singleton x) (Seq.skip 1 ys) |/ (xprod f (Seq.skip 1 xs) ys)
+                }
+
+    // closure calculates the Kleene closure x* of a function, a least element and
+    // a set of strings: closure is the fixed point of k = z | f(k).
+    let rec closure f z xs =
+        if Seq.isEmpty xs then
+            Seq.singleton z
+        else
+            let x,xt = Seq.head xs, Seq.skip 1 xs
+            if x = z then
+                closure f z xt
+            else
+                // Using seq {} here simulates the laziness of Haskell's :: operator.
+                seq {
+                     yield z;
+                     yield! xprod f xs (closure f z xs)
+                    }
 
     // Use parseNull to retrieve all possible parses of the input thus far.
     let rec parseNull (p: Parser<'a>): Set<'a list> =
@@ -71,9 +156,13 @@ module Regex =
         | Union (a,b) -> Set.union (parseNull a) (parseNull b)
         | Cat (a, b)  -> let prefix = parseNull a
                          let suffix = parseNull b
-                         allPairs prefix suffix List.append
-                         |> Seq.map List.ofSeq
-                         |> Set.ofSeq
+                         match (Seq.isEmpty prefix, Seq.isEmpty suffix) with
+                         | true, true  -> Set.empty
+                         | false, true -> prefix
+                         | true, false -> suffix
+                         | false, false -> xprod List.append prefix suffix
+                                           |> Seq.map List.ofSeq
+                                           |> Set.ofSeq
         | Star a -> parseNull a
 
     // dP returns the derivative of a parser combinator with respect to the input token c.
@@ -96,34 +185,6 @@ module Regex =
     | Cat (a, b)                 -> Cat (dP c a, b)
     | Star a                     -> Cat (dP c a, Star a)
 
-    // interleave returns a sequence that draws elements from each of the sequences in turn.
-    // As each sequence empties, interleave forgets about the sequence.
-    // For instance interleave [Seq.ofList [1;2;3]; Seq.ofList [4;5;6]; Seq.empty; Seq.ofList [10;11]
-    // returns, in order, [1;4;10;2;5;11;3;6].
-    // O(n^2)! Likely because of that List.append...
-    let rec interleave = function
-        | [] -> Seq.empty
-        | fst::rest -> seq {
-                            if Seq.isEmpty fst then
-                                yield! interleave rest
-                            else
-                                yield Seq.head fst
-                                // Rotate the list of sequences, so we round-robin.
-                                yield! interleave (List.append rest [Seq.skip 1 fst]) }
-    let interleave2 a b = interleave [a;b]
-
-    // interleaveSeq returns a sequence that draws elements from each of the sequences in turn.
-    // As each sequence empties, interleave forgets about the sequence.
-    // O(n), but doesn't interleave fairly!
-    let rec interleaveSeq seqs =
-        seq {
-             for s in seqs do
-                 if not (Seq.isEmpty s) then
-                     yield Seq.head s
-             let remainder = Seq.filter (fun s -> not (Seq.isEmpty s)) seqs
-             if not (Seq.isEmpty remainder) then
-                 yield! interleaveSeq (Seq.map (Seq.skip 1) remainder)}
-
     // generate generates every word in the language described by a parser p.
     // It does so in a fair manner, in that the union of two parsers a and b
     // will return words from a and b, in order.
@@ -131,21 +192,12 @@ module Regex =
         let rec gen = function
         | Empty       -> Seq.empty
         | Eps
-        | Eps' _      -> seq { yield [] } // generate doesn't use the parse trees.
-        | Char c      -> seq { yield [c] }
-        | Union (a,b) -> interleave2 (gen a) (gen b)
-        | Cat (a,b)   -> seq {
-                              let seqA = gen a
-                              let seqB = gen b
-                              match Seq.isEmpty seqA, Seq.isEmpty seqB with
-                              | true, true
-                              | true, false
-                              | false, true  -> yield! Seq.empty
-                              | false, false -> yield! (allPairs seqA seqB (fun a b -> List.append a b)) }
-        | Star a      -> seq {
-                              yield! gen (Eps' (Set.singleton []))
-                              yield! gen a } // <-- This is wrong. See the generate-kleene-star-languages branch for explorations in fixing the bug.
-        Seq.distinct (gen p)
+        | Eps' _      -> seq { yield LOL.over [] } // generate doesn't use the parse trees.
+        | Char c      -> seq { yield LOL.over [c] }
+        | Union (a,b) -> (gen a) |/ (gen b)
+        | Cat (a,b)   -> xprod LOL.append (gen a) (gen b)
+        | Star a      -> closure LOL.append (LOL.over []) (gen a)
+        gen p |> Seq.map LOL.unwrap
 
     // exactlyEqual returns true if the only value that sequence yields - and only once - is value.
     // It's like value = Seq.exactlyOne seq, only doesn't throw an exception.

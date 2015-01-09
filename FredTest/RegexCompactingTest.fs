@@ -92,10 +92,9 @@ type ``Compacting``() =
         Check.QuickThrowOnFailure compactedParserIsCompact
     [<Test>]
     member x.``does not alter the accepted language``() =
-        let takeSome seq =
-            seq
-            |> Seq.truncate 1000
-            |> List.ofSeq
+        // This test flickers in NCrunch because it can take longer than a minute to run,
+        // making NCrunch (with default timeouts) kill the test.
         let langUnaltered (p: Parser<int>) =
-            takeSome (generate p) = takeSome (generate (compact p))
+            printfn "%A" p
+            seqEqual (generate p) (generate (compact p))
         Check.QuickThrowOnFailure langUnaltered
