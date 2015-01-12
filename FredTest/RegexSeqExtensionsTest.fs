@@ -61,6 +61,7 @@ type ``Ordered merge``() =
         let a = seq {yield 0; yield 1; yield 3}
         let b = seq {yield 1; yield 2}
         seqEqual (seq { yield 0; yield 1; yield 2; yield 3}) (a |/ b)
+        seqEqual (seq { yield 0; yield 1; yield 2; yield 3}) (b |/ a)
 
 [<TestFixture>]
 type ``xprod (cross product of sequences)``() =
