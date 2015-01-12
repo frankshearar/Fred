@@ -140,9 +140,9 @@ module Regex =
         if Seq.isEmpty xs then
             Seq.singleton z
         else
-            let x,xt = Seq.head xs, Seq.skip 1 xs
+            let x = Seq.head xs
             if x = z then
-                closure f z xt
+                closure f z (Seq.skip 1 xs)
             else
                 // Using seq {} here simulates the laziness of Haskell's :: operator.
                 seq {
