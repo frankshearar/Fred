@@ -18,7 +18,7 @@ type ``Building parse trees``() =
         Check.QuickThrowOnFailure justOneParse
     [<Test>]
     member x.``from Empty should yield no parses``() =
-        Assert.AreEqual(Set.empty, (parseNull Empty))
+        setEqual Set.empty (parseNull Empty)
     [<Test>]
     member x.``from Char should yield no parses``() =
         let noParses (t: char) =
@@ -31,16 +31,11 @@ type ``Building parse trees``() =
         Check.QuickThrowOnFailure setUnion
     [<Test>]
     member x.``from Cat should yield parse trees assembled from subparsers' parse trees``() =
-        let parsesIncludesFirstParsesThenEps (p1: Parser<int>) p2 =
-            let firstParses = parseNull p1
-            let secondParses = parseNull p2
-            let catParses = parseNull (Cat (p1, p2)) |> List.ofSeq
-            seq {for first in firstParses do
-                     for second in secondParses do
-                         yield List.append first second}
-            |> Seq.map (fun parse -> List.exists (fun each -> each = parse) catParses)
-            |> Seq.fold (&&) true
-        Check.QuickThrowOnFailure parsesIncludesFirstParsesThenEps
+        let a = Eps' (set [['a']; ['b']])
+        let b = Eps' (set [['1']; ['2']])
+        let parses = parseNull (Cat (a, b))
+        let expected = xprod List.append (parseNull a) (parseNull b) |> Set.ofSeq
+        setEqual expected parses
     [<Test>]
     member x.``from Cat should yield concatenated parses even if second parser has none``() =
-        Assert.AreEqual(set [['a']], (parseNull (Cat (Eps' (set [['a']]),Star (Char 'a')))))
+        setEqual (set [['a']]) (parseNull (Cat (Eps' (set [['a']]),Star (Char 'a'))))
