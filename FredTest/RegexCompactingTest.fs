@@ -92,9 +92,14 @@ type ``Compacting``() =
         Check.QuickThrowOnFailure compactedParserIsCompact
     [<Test>]
     member x.``does not alter the accepted language``() =
-        // This test flickers in NCrunch because it can take longer than a minute to run,
-        // making NCrunch (with default timeouts) kill the test.
         let langUnaltered (p: Parser<int>) =
-            printfn "%A" p
-            seqEqual (generate p) (generate (compact p))
+            // This is a very small limit, because generating words from
+            // Star parsers is something like exponential: on my laptop,
+            // generating the 15th word of a* takes ~32 seconds! Checking
+            // only the first 5 words isn't super great, but the test
+            // should then reliably finish inside a minute.
+            let limit = 5
+            let expected = p |> generate |> Seq.truncate limit
+            let actual = p |> compact |> generate |> Seq.truncate limit
+            seqEqual expected actual
         Check.QuickThrowOnFailure langUnaltered
