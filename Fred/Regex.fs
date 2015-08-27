@@ -36,7 +36,7 @@ module Regex =
         | Char _       -> false
         | Union (a, b) -> nullable a || nullable b
         | Cat (a, b)   -> nullable a && nullable b
-        | Star a       -> true
+        | Star _       -> true
 
     // empty returns true if a parser has failed to recognise a string.
     let rec empty = function
@@ -46,7 +46,7 @@ module Regex =
         | Char _       -> false
         | Union (a, b) -> empty a && empty b
         | Cat (a, b)   -> empty a || empty b
-        | Star p       -> false
+        | Star _       -> false
 
     // Given two sequences and a function, return the result of applying
     // that function to every pair of values in the sequences.
@@ -314,7 +314,7 @@ module Regex =
     // of repetitions of any word in p's language.
     let reps min max p =
         match min,max with
-        | l,u when l < 0 -> invalidArg "min" "min >= 0"
+        | l,_ when l < 0 -> invalidArg "min" "min >= 0"
         | l,u when u < l -> invalidArg "max" "max >= min"
         | l,u            -> seq { l..u }
                             |> Seq.map (fun n -> rep n p)
@@ -381,7 +381,7 @@ module Regex =
                                 | false, []
                                 | false, _::_
                                 | true,  [] -> baseParser::rest // Add a new parser for non-maximal munchers
-                                | true,  p::ps -> rest)         // Otherwise, just keep the old one ticking along.
+                                | true,  _::_ -> rest)          // Otherwise, just keep the old one ticking along.
                                 |> List.map (fun p -> dP x p)
                                 |> List.map compact
                                 |> reject empty
