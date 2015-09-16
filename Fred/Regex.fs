@@ -1,6 +1,7 @@
 ﻿namespace Fred
 
 // TODO:
+// Add a "reactive" API, so that as you process a stream of things you can Observe the matches.
 // Short-hand string so you can say /[a-z]+/ or whatever <-- ?? see puffnfresh's comments about "improve regex by removing stringly typing & parsing"
 // Reduction parsers apply a function to a match.
 // Wildcard - a parser that accepts any single token. Looks a lot like Char, turns into an Eps/Eps' on derivation.
@@ -124,10 +125,128 @@ module Regex =
              if not (Seq.isEmpty remainder) then
                  yield! interleaveSeq (Seq.map (Seq.skip 1) remainder)}
 
+    let (|LT|EQ|GT|) (a, b) =
+        match compare a b with
+        | 0 -> EQ
+        | n when n < 0 -> LT
+        | _ -> GT
+
+    // |/ merges two ordered (according to the elements' compare) sequences
+    // such that resulting sequence is ordered (by the elements' compare).
+    // (I'd use (\/) like the original paper (McIlroy, Enumerating the Strings
+    // of Regular Languages), but no \s allowed!
+    let rec (|/) xs ys =
+         match Seq.isEmpty xs, Seq.isEmpty ys with
+         | true, true -> Seq.empty
+         | true, false -> ys
+         | false, true -> xs
+         | false, false ->
+            // Pulling out the tails in let bindings looks neater,
+            // but means we throw one of those tails away every
+            // time the comparison of heads is not EQ. |/ is used
+            // A LOT, so let's be efficient with some loss of beauty.
+            let x = Seq.head xs
+            let y = Seq.head ys
+            match x, y with
+            | LT -> seq { yield x; yield! (Seq.skip 1 xs) |/ ys              }
+            | EQ -> seq { yield x; yield! (Seq.skip 1 xs) |/ (Seq.skip 1 ys) }
+            | GT -> seq { yield y; yield!              xs |/ (Seq.skip 1 ys) }
+
+    type Ident = int
+    type NFA<'a> when 'a: comparison = State<'a> seq
+    and [<CustomEquality; CustomComparison>] State<'a> when 'a: comparison =
+        | State of Ident * 'a * NFA<'a> (* destination states *)
+        interface System.IComparable with
+            member x.CompareTo(obj: System.Object) =
+                match obj with
+                | :? State<_> as y ->
+                    match x, y with
+                    | State (i, c, _), State (i', c', _) -> compare (c,i) (c',i')
+                | _ -> -1
+        override x.Equals(obj: System.Object) =
+            (x :> System.IComparable).CompareTo(obj) = 0
+        override x.GetHashCode() =
+            match x with
+            | State (c,i,_) -> hash (c,i)
+
+    type Word<'a> when 'a: comparison = | Word of 'a * NFA<'a>
+
+    let bp bypassable ds: NFA<_> =
+        if bypassable then ds else Seq.empty
+
+    let rec r2n' (p: Parser<_>) (i: Ident) (nfa: NFA<_>): NFA<_> * Ident * bool =
+        match p, i, nfa with
+        | Empty,  n, _ -> Seq.empty, n, false
+        | Eps,    n, _
+        | Eps' _, n, _ -> Seq.empty, n, true
+        | Char c, n, ds -> (Seq.singleton (State (n, c, ds))), (n+1), false
+        | Union (x, y), n, ds ->
+            let fs, n', b = r2n' y n ds
+            let fs', n'', b' = r2n' x n' ds
+            (fs|/fs'), n'', b||b'
+        | Cat (x, y), n, ds ->
+            let fs, n', b = r2n' y n ds
+            let fs', n'', b' = r2n' x n' (fs |/ (bp b ds))
+            (fs' |/ (bp b' fs)), n'', (b && b')
+        | Star x, n, ds ->
+            let fs = ref Seq.empty
+            let fs, n', _ = r2n' x n (!fs |/ ds)
+//            let rec (fs, n', _) = r2n' x n (fs |/ ds)
+            fs, n', true
+
+    let r2n (r: Parser<_>): NFA<_> =
+        let ds = [State (0, '~', [])]
+        let fs, _, b = r2n' r 1 ds
+        fs |/ (bp b ds)
+
+    let accept (ds: NFA<_>): bool =
+        ds
+        |> Seq.map (function | State (i, _, _) -> i)
+        |> Seq.exists (fun x -> x = 0)
+
+//    let visit (w: Word<_> seq): string seq =
+//        if (Seq.isEmpty w) then
+//            Seq.empty
+//        else
+//            match Seq.head with
+//            | Word x, ds ->
+//                let ws = Seq.skip 1 w
+//                if accept ds then
+//                    x::xs
+//                else
+//                    xs
+
+    let grp (nfa: NFA<_>): NFA<_> = nfa
+
+//visit [] = []
+//visit ((x,ds):ws) = let { xs = visit (ws ++ [(x++[c],ds’) | (State _ c ds’) <- grp ds]) } in
+//    if accept ds then x:xs else xs
+
+    let rec visit (w: Word<_> list): string list =
+        match w with
+        | [] -> []
+        | Word (x, ds) :: ws ->
+            let successors = grp ds
+                             |> Seq.map (function | State (_, c, ds') -> Word ((x + c), ds'))
+                             |> List.ofSeq
+            let xs = visit (List.append ws successors)
+            if accept ds then x::xs else xs
+
+    let enumA (starts: NFA<_>): string list =
+        visit [Word ("", starts)]
+
     // generate generates every word in the language described by a parser p.
     // It does so in a fair manner, in that the union of two parsers a and b
     // will return words from a and b, in order.
     let generate p =
+        Seq.empty
+//        r2n p |> List.ofSeq |> enumA
+
+    // generate generates every word in the language described by a parser p.
+    // It does so in a fair manner, in that the union of two parsers a and b
+    // will return words from a and b, in order.
+    // EXPONENTIAL TIME
+    let generateExp p =
         let rec gen = function
         | Empty       -> Seq.empty
         | Eps

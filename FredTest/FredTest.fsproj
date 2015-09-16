@@ -50,6 +50,7 @@
     <Compile Include="RegexCompactingTest.fs" />
     <Compile Include="RegexDerivingTest.fs" />
     <Compile Include="RegexEmptinessTest.fs" />
+    <Compile Include="RegexGeneratingTest.fs" />
     <Compile Include="RegexNullabilityTest.fs" />
     <Compile Include="RegexParseTrees.fs" />
     <Compile Include="RegexSeqExtensionsTest.fs" />
