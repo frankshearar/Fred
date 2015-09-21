@@ -77,10 +77,9 @@ type ``NFA``() =
         let ``ab*a`` = [Cat(Cat (Char 'a', Star (Char 'b')), Char 'a')
                         Cat (Char 'a', Cat (Star (Char 'b'), Char 'a'))]
         let rec g0 = State (0, '~', [])
-        and x = [g1; g2]
         and g1 = State (1, 'a', [g0])
-        and g2 = State (2, 'b', x)
-        and g3 = State (3, 'a', [g1;g2])
-        and g = [g3]
+        and g2 = State (2, 'b', seq { yield g1; yield g2})
+        and g3 = State (3, 'a', seq { yield g1; yield g2})
+        and g = Seq.singleton g3
         ``ab*a``
-        |> List.iter (fun x -> nfaEqual g (r2n x)) 
+        |> List.iter (fun x -> nfaEqual g (r2n x))

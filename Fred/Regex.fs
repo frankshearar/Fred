@@ -159,7 +159,7 @@ module Regex =
         interface System.IComparable with
             member x.CompareTo(obj: System.Object) =
                 match obj with
-                | :? State<_> as y ->
+                | :? State<'a> as y ->
                     match x, y with
                     | State (i, c, _), State (i', c', _) -> compare (c,i) (c',i')
                 | _ -> -1
