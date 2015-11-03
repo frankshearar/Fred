@@ -17,6 +17,18 @@
 // * UnionN of list: 3x slower than folded Unions (for 5 elements)
 // * UnionN of array: 2x slower than folded Unions (for 5 elements)
 
+// Bugs in the paper?
+// section 5.2.1:
+//
+//     If e is (Sym c), the automaton has one state, which accepts symbol c; it is not
+//     bypassable. Its identifier is n; the next available identifier is n+1. The state’s moves
+//     go to the destination states ds.
+//     F(e) = {state n}
+//     b(e) = true
+//     r2n’ (Sym c) n ds = ([State n c ds], n+1, False)
+//
+// But then surely b(e) = false ?!
+
 module Regex =
     open System.Text // For StringBuilder
     type Parser<'a> when 'a: comparison =     // "when 'a: comparison" because we use a Set to store parse trees.
