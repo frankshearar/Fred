@@ -12,25 +12,25 @@ open Regex.Test.Extensions
 [<TestFixture>]
 type ``Building parse trees``() =
     [<Test>]
-    member x.``from Eps should yield sole parse tree``() =
+    member __.``from Eps should yield sole parse tree``() =
         let justOneParse (t: char list) =
             set [t] = (parseNull (Eps' (set [t])))
         Check.QuickThrowOnFailure justOneParse
     [<Test>]
-    member x.``from Empty should yield no parses``() =
+    member __.``from Empty should yield no parses``() =
         Assert.AreEqual(Set.empty, (parseNull Empty))
     [<Test>]
-    member x.``from Char should yield no parses``() =
+    member __.``from Char should yield no parses``() =
         let noParses (t: char) =
             Set.isEmpty (parseNull (Char t))
         Check.QuickThrowOnFailure noParses
     [<Test>]
-    member x.``from Union should yield subparsers' parse trees``() =
+    member __.``from Union should yield subparsers' parse trees``() =
         let setUnion (a: Parser<int>) b =
             (parseNull (Union (a, b))) = Set.union (parseNull a) (parseNull b)
         Check.QuickThrowOnFailure setUnion
     [<Test>]
-    member x.``from Cat should yield parse trees assembled from subparsers' parse trees``() =
+    member __.``from Cat should yield parse trees assembled from subparsers' parse trees``() =
         let parsesIncludesFirstParsesThenEps (p1: Parser<int>) p2 =
             let firstParses = parseNull p1
             let secondParses = parseNull p2
@@ -42,5 +42,5 @@ type ``Building parse trees``() =
             |> Seq.fold (&&) true
         Check.QuickThrowOnFailure parsesIncludesFirstParsesThenEps
     [<Test>]
-    member x.``from Cat should yield concatenated parses even if second parser has none``() =
+    member __.``from Cat should yield concatenated parses even if second parser has none``() =
         Assert.AreEqual(set [['a']], (parseNull (Cat (Eps' (set [['a']]),Star (Char 'a')))))

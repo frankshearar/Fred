@@ -12,66 +12,66 @@ open Regex.Test.Extensions
 [<TestFixture>]
 type ``Matching``() =
     [<Test>]
-    member x.``Empty``() =
+    member __.``Empty``() =
         Assert.False(matches Empty [])
     [<Test>]
-    member x.``Eps matches empty input``() =
+    member __.``Eps matches empty input``() =
         Assert.That(matches Eps [])
     [<Test>]
-    member x.``Eps' [] matches empty input``() =
+    member __.``Eps' [] matches empty input``() =
         Assert.That(matches (Eps' (set [[]])) [])
     [<Test>]
-    member x.``Eps' [] doesn't match non-empty input``() =
+    member __.``Eps' [] doesn't match non-empty input``() =
         Assert.False(matches (Eps' (set [[]])) ['a'])
     [<Test>]
-    member x.``Char matches own token``() =
+    member __.``Char matches own token``() =
         Assert.That(matches (Char 'a') ['a'])
         Assert.False(matches (Char 'a') ['b'])
     [<Test>]
-    member x.``Char doesn't match left over input``() =
+    member __.``Char doesn't match left over input``() =
         Assert.False(matches (Char 'a') ['a'; 'b'])
     [<Test>]
-    member x.``Union matches with either subparser``() =
+    member __.``Union matches with either subparser``() =
         let union = Union (Char 'a', Char 'b')
         Assert.That(matches union ['a'])
         Assert.That(matches union ['b'])
         Assert.False(matches union ['c'])
     [<Test>]
-    member x.``Union doesn't match left over input``() =
+    member __.``Union doesn't match left over input``() =
         let union = Union (Char 'a', Char 'b')
         Assert.False(matches union ['c'])
     [<Test>]
-    member x.``Cat matches with both parsers``() =
+    member __.``Cat matches with both parsers``() =
         let cat = Cat (Char 'a', Char 'b')
         Assert.That(matches cat ['a'; 'b'])
     [<Test>]
-    member x.``Cat doesn't match short input``() =
+    member __.``Cat doesn't match short input``() =
         let cat = Cat (Char 'a', Char 'b')
         Assert.False(matches cat ['a'])
     [<Test>]
-    member x.``Cat doesn't match unexpected input``() =
+    member __.``Cat doesn't match unexpected input``() =
         let cat = Cat (Char 'a', Char 'b')
         Assert.False(matches cat ['b'; 'b'])
         Assert.False(matches cat ['a'; 'a'])
     [<Test>]
-    member x.``Cat doesn't match left over input``() =
+    member __.``Cat doesn't match left over input``() =
         let cat = Cat (Char 'a', Char 'b')
         Assert.False(matches cat ['a'; 'b'; 'c'])
     [<Test>]
-    member x.``Star matches empty input``() =
+    member __.``Star matches empty input``() =
         Assert.That(matches (Star (Char 'a')) [])
     [<Test>]
-    member x.``Star matches repeated elements``() =
+    member __.``Star matches repeated elements``() =
         let star = Star (Char 'a')
         Assert.That(matches star ['a'])
         Assert.That(matches star ['a'; 'a'])
         Assert.That(matches star ['a'; 'a'; 'a'])
     [<Test>]
-    member x.``Star doesn't match unexpected input``() =
+    member __.``Star doesn't match unexpected input``() =
         let star = Star (Char 'a')
         Assert.False(matches star ['b'])
     [<Test>]
-    member x.``matchSeq matches against seqs``() =
+    member __.``matchSeq matches against seqs``() =
         let star = Star (Char 'a')
         Assert.That(matchSeq star (Seq.singleton 'a'))
         Assert.That(matchSeq star (Seq.init 2 (fun _ -> 'a')))
@@ -80,7 +80,7 @@ type ``Matching``() =
 [<TestFixture>]
 type ``Testing any``() =
     [<Test>]
-    member x.``should accept any of the listed tokens``() =
+    member __.``should accept any of the listed tokens``() =
         let nonEmptyAcceptsAnyAlternative (tokens: char list) = // We need a concrete type because Geneflect doesn't handle IComparable
             not (List.isEmpty tokens) ==>
             let p = any tokens
@@ -92,10 +92,10 @@ type ``Testing any``() =
             |> List.fold (&&) true
         Check.QuickThrowOnFailure nonEmptyAcceptsAnyAlternative
     [<Test>]
-    member x.``with no tokens means Empty``() =
+    member __.``with no tokens means Empty``() =
         parserEqual Empty (any [])
     [<Test>]
-    member x.``with single token means Char``() =
+    member __.``with single token means Char``() =
         let oneMeansChar (x: char) = // We need a concrete type because Geneflect doesn't handle IComparable
             match any [x] with
             | Char y -> x = y
@@ -105,17 +105,17 @@ type ``Testing any``() =
 [<TestFixture>]
 type ``Testing all``() =
     [<Test>]
-    member x.``with no tokens means Empty``() =
+    member __.``with no tokens means Empty``() =
         parserEqual Empty (all [])
     [<Test>]
-    member x.``with one token means Char``() =
+    member __.``with one token means Char``() =
         let oneMeansChar (x: char) = // We need a concrete type because Geneflect doesn't handle IComparable
             match all [x] with
             | Char y -> x = y
             | _      -> false
         Check.QuickThrowOnFailure oneMeansChar
     [<Test>]
-    member x.``with multiple tokens means Cat``() =
+    member __.``with multiple tokens means Cat``() =
         let manyMeansCat (xs: char list) =
             not (List.isEmpty xs) ==>
             matches (all xs) xs
@@ -125,52 +125,52 @@ type ``Testing all``() =
 type ``rep parser``() =
     let threeAs = rep 3 (Char 'a')
     [<Test>]
-    member x.``matches 0 repetitions of a parser through Eps``() =
+    member __.``matches 0 repetitions of a parser through Eps``() =
         parserEqual Eps (rep 0 (Char 'a'))
     [<Test>]
-    member x.``matches 1 repetition of a parser through identity``() =
+    member __.``matches 1 repetition of a parser through identity``() =
         parserEqual (Char 'a') (rep 1 (Char 'a'))
     [<Test>]
-    member x.``matches N repetitions of a parser``() =
+    member __.``matches N repetitions of a parser``() =
         Assert.That(matches threeAs (List.replicate 3 'a'))
     [<Test>]
-    member x.``doesn't match N+M, M > 0, repetitions of a parser``() =
+    member __.``doesn't match N+M, M > 0, repetitions of a parser``() =
         Assert.False(matches threeAs (List.replicate 2 'a'))
     [<Test>]
-    member x.``doesn't match N+M, 0 < M < N, repetitions of a parser``() =
+    member __.``doesn't match N+M, 0 < M < N, repetitions of a parser``() =
         Assert.False(matches threeAs (List.replicate 4 'a'))
 
 [<TestFixture>]
 type ``atLeast parser``() =
     let atLeastThreeAs = atLeast 3 (Char 'a')
     [<Test>]
-    member x.``matches N repetitions of a parser``() =
+    member __.``matches N repetitions of a parser``() =
         Assert.That(matches atLeastThreeAs (List.replicate 3 'a'))
     [<Test>]
-    member x.``matches N+M, M > 0, repetitions of a parser``() =
+    member __.``matches N+M, M > 0, repetitions of a parser``() =
         Assert.That(matches atLeastThreeAs (List.replicate 6 'a'))
     [<Test>]
-    member x.``doesn't match N-M, 0 < M < N, repetitions of a parser``() =
+    member __.``doesn't match N-M, 0 < M < N, repetitions of a parser``() =
         Assert.False(matches atLeastThreeAs (List.replicate 2 'a'))
     [<Test>]
-    member x.``requires a non-negative count``() =
+    member __.``requires a non-negative count``() =
         Assert.Throws<System.ArgumentException>(fun () -> atLeast -1 (Char 'a') |> ignore) |> ignore
 
 [<TestFixture>]
 type ``atMost parser``() =
     let atMostThreeAs = atMost 3 (Char 'a')
     [<Test>]
-    member x.``matches 0 repetitions of a parser``() =
+    member __.``matches 0 repetitions of a parser``() =
         Assert.That(matches atMostThreeAs [])
     [<Test>]
-    member x.``matches N-M, 0 < M < N, repetitions of a parser``() =
+    member __.``matches N-M, 0 < M < N, repetitions of a parser``() =
         Assert.That(matches atMostThreeAs (List.replicate 1 'a'))
         Assert.That(matches atMostThreeAs (List.replicate 2 'a'))
     [<Test>]
-    member x.``matches N repetitions of a parser``() =
+    member __.``matches N repetitions of a parser``() =
         Assert.That(matches atMostThreeAs (List.replicate 3 'a'))
     [<Test>]
-    member x.``does not match N+M, M > 0, repetitions of a parser``() =
+    member __.``does not match N+M, M > 0, repetitions of a parser``() =
         Assert.False(matches atMostThreeAs (List.replicate 4 'a'))
 
 [<TestFixture>]
@@ -180,10 +180,10 @@ type ``alpha parser``() =
                         yield! seq {'A' .. 'Z'}
                         }
     [<Test>]
-    member x.``accepts all English alphabet characters``() =
+    member __.``accepts all English alphabet characters``() =
         Assert.That(matches (Star alpha) (alphabet |> List.ofSeq))
     [<Test>]
-    member x.``accepts no other input``() =
+    member __.``accepts no other input``() =
         // Hardly an exhaustive list, but generating chars and filtering out the unacceptable
         // chars is pretty expensive.
         Assert.False(matches alpha ['0'])
@@ -199,10 +199,10 @@ type ``alphanum parser``() =
                         yield! seq {'0' .. '9'}
                         }
     [<Test>]
-    member x.``accepts all English alphabet characters, and digits``() =
+    member __.``accepts all English alphabet characters, and digits``() =
         Assert.That(matches (Star alphanum) (alphabetOrDigit |> List.ofSeq))
     [<Test>]
-    member x.``accepts no other input``() =
+    member __.``accepts no other input``() =
         // Hardly an exhaustive list, but generating chars and filtering out the unacceptable
         // chars is pretty expensive.
         Assert.False(matches alpha ['|'])
@@ -212,20 +212,20 @@ type ``alphanum parser``() =
 [<TestFixture>]
 type ``opt parser``() =
     [<Test>]
-    member x.``accepts no input``() =
+    member __.``accepts no input``() =
         Assert.True(matches (opt alpha) [])
     [<Test>]
-    member x.``accepts a word from the parser's language``() =
+    member __.``accepts a word from the parser's language``() =
         Assert.True(matches (opt alpha) ['a'])
 
 [<TestFixture>]
 type ``num parser``() =
     let digits = seq {'0' .. '9'}
     [<Test>]
-    member x.``accepts all digit characters``() =
+    member __.``accepts all digit characters``() =
         Assert.That(matches (Star num) (digits |> List.ofSeq))
     [<Test>]
-    member x.``accepts no other input``() =
+    member __.``accepts no other input``() =
         // Hardly an exhaustive list, but generating chars and filtering out the unacceptable
         // chars is pretty expensive.
         Assert.False(matches num ['a'])
@@ -237,57 +237,57 @@ type ``num parser``() =
 [<TestFixture>]
 type ``find function``() =
     [<Test>]
-    member x.``with no input returns no results, regardless of parser``() =
+    member __.``with no input returns no results, regardless of parser``() =
         let neverAnyResultsForNoInput (p: Parser<char>) =
             let matches = find p [] |> List.ofSeq
             listEqual [] matches
         Check.QuickThrowOnFailure neverAnyResultsForNoInput
     [<Test>]
-    member x.``with input, never returns an empty match``() =
+    member __.``with input, never returns an empty match``() =
         let neverReturnAnEmpty (p: Parser<char>) (input: char list) =
             not (List.isEmpty input) ==>
             let matches = find p input |> List.ofSeq
             None = List.tryFind List.isEmpty matches
         Check.QuickThrowOnFailure neverReturnAnEmpty
     [<Test>]
-    member x.``can match entire input``() =
+    member __.``can match entire input``() =
         let hit = ['a';'b';'c']
         let matches = find (all hit) hit |> List.ofSeq
         listEqual [hit] matches
     [<Test>]
-    member x.``can find a single match``() =
+    member __.``can find a single match``() =
         let hit = ['a';'b';'c']
         let matches = find (all hit) ['a'..'z'] |> List.ofSeq
         listEqual [hit] matches
     [<Test>]
-    member x.``can return multiple matches``() =
+    member __.``can return multiple matches``() =
         let hit = ['a';'b';'c']
         let matches = find (all hit) (['a'..'z']@['a'..'z']) |> List.ofSeq
         listEqual [hit;hit] matches
     [<Test>]
-    member x.``can find single-char matches at the start of input``() =
+    member __.``can find single-char matches at the start of input``() =
         let matches = find (Char 'a') ("abababababbaabbbabbababa" |> List.ofSeq) |> List.ofSeq
         listEqual ['a'] (List.head matches)
         Assert.AreEqual(11, List.length matches)
     [<Test>]
-    member x.``can find overlapping matches``() =
+    member __.``can find overlapping matches``() =
         let hit = ['a'; 'b'; 'a']
         let matches = find (all hit) ("abababababbaabbbabbababa" |> List.ofSeq) |> List.ofSeq
         listEqual hit (List.head matches)
         Assert.AreEqual(6, List.length matches)
     [<Test>]
-    member x.``with Char can find matches``() =
+    member __.``with Char can find matches``() =
         listEqual [['a']] ((find (Char 'a') ['a']) |> List.ofSeq)
         listEqual [['a']] ((find (Char 'a') ['b';'a']) |> List.ofSeq)
         listEqual [['a']] ((find (Char 'a') ['b';'a';'b']) |> List.ofSeq)
     [<Test>]
-    member x.``with Star can find greedy/maximal matches``() =
+    member __.``with Star can find greedy/maximal matches``() =
         listEqual [['a';'a']] ((find (Star (Char 'a')) ['a';'a';'b']) |> List.ofSeq)
     [<Test>]
-    member x.``with Star can find trailing matches``() =
+    member __.``with Star can find trailing matches``() =
         listEqual [['a';'a']] ((find (Star (Char 'a')) ['b';'a';'a']) |> List.ofSeq)
     [<Test>]
-    member x.``Star doesn't match unexpected input``() =
+    member __.``Star doesn't match unexpected input``() =
         let star = Star (Char 'a')
         let matches = (find star ['b']) |> List.ofSeq
         listEqual [] matches
@@ -295,20 +295,20 @@ type ``find function``() =
 [<TestFixture>]
 type ``findMatches function``() =
     [<Test>]
-    member x.``matches seqs``() =
+    member __.``matches seqs``() =
         seqEqual (Seq.singleton ['a']) ((findMatches (Char 'a') ['a']))
 
 [<TestFixture>]
 type ``Resumable find``() =
     [<Test>]
-    member x.``can pause parsing``() =
+    member __.``can pause parsing``() =
         let position = resumableFind (startFind (all ['a';'b'])) "ab"
         let partialParses =
             finishFind position
             |> List.ofSeq
         listEqual [['a';'b']] partialParses
     [<Test>]
-    member x.``can resume parsing``() =
+    member __.``can resume parsing``() =
         let pos1 = resumableFind (startFind (all ['a';'b'])) "ab"
         let pos2 = resumableFind pos1 "ab"
         let completedParses =
