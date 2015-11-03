@@ -95,7 +95,10 @@ type ``Compacting``() =
         let takeSome seq =
             seq
             |> Seq.truncate 1000
-            |> List.ofSeq
-        let langUnaltered (p: Parser<int>) =
-            takeSome (generate p) = takeSome (generate (compact p))
+        let langUnaltered (p: Parser<char>) =
+            let expected = takeSome (generate p)
+            let actual = takeSome (generate (compact p))
+            let theSame = Seq.zip expected actual |> Seq.map (fun (es,xs) -> Seq.zip es xs |> Seq.map (fun (e, a) -> e = a) |> Seq.fold (&&) true) |> Seq.fold (&&) true
+            if not(theSame) then printfn "Expected %A: Was: %A"  expected actual
+            theSame
         Check.QuickThrowOnFailure langUnaltered
