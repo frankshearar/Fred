@@ -339,10 +339,18 @@ module Regex =
              Bypassable = first.Bypassable && second.Bypassable}
         | Star x, n, ds ->
             let inner = r2n' x n ds
-            {Machine = inner.Machine |> addDestEdges n ds |> addDestEdges n inner.FirstStates
-             FirstStates = List.append inner.FirstStates ds
-             NextIdent = inner.NextIdent
-             Bypassable = true}
+            if (inner.NextIdent > n) then
+                {Machine = inner.Machine |> addDestEdges n ds |> addDestEdges n inner.FirstStates
+                 FirstStates = List.append inner.FirstStates ds
+                 NextIdent = inner.NextIdent
+                 Bypassable = true}
+            else
+                // If NextIdent didn't increase, inner is semantically equivalent to Empty or Eps/Eps'.
+                // Thus there are no dest edges to add, and there are no first states to add (???).
+                {Machine = inner.Machine
+                 FirstStates = inner.FirstStates
+                 NextIdent = inner.NextIdent
+                 Bypassable = true}
 
     let r2n (r: Parser<'a>) : NFA<'a> =
         let terminatingState = {Ident = 0; Token = Unchecked.defaultof<'a>} // Direct reference to final token!

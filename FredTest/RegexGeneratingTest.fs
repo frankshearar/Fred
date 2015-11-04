@@ -150,6 +150,11 @@ type ``Transforming to NFA``() =
         draw nfa |> printfn "%s"
         Assert.AreEqual(0, (edgeCount nfa))
     [<Test>]
+    member __.``Star (Cat (Eps, Eps))``() =
+        let nfa = r2n (Star (Cat (Eps, Eps)))
+        draw nfa |> printfn "%s"
+        Assert.AreEqual(0, (edgeCount nfa))
+    [<Test>]
     member __.``example 9``() =
         let nfa = example9
         draw nfa |> printfn "%s"
