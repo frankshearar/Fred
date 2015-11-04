@@ -355,8 +355,10 @@ module Regex =
     let accept (ds: Ident seq): bool =
         ds |> Seq.exists (fun d -> d = 0) // Direct reference to final token!
 
-    type Walk = {Current: Ident; ReversePath: Ident list}
-    // Yield a sequence of _paths_ through a NFA. The paths are REVERSED.
+    type Walk = {ReversePath: Ident list}
+    // Yield a sequence of _paths_ through a NFA. The paths are REVERSED. This
+    // lets users determine, in constant time, the last node reached. (For example,
+    // checking acceptance of a word in an NFA representing a regular expression.)
     let bfsPath (startIdxs: Ident seq) (nfa: NFA<'a>) =
         let sortedByToken nfa idents =
             idents
@@ -365,13 +367,13 @@ module Regex =
             |> Seq.map (fun state -> state.Ident)
         let nextSteps (walk: Walk) (nfa: NFA<'a>) =
             seq {
-                let nextEdges = edgesOf walk.Current nfa
+                let nextEdges = edgesOf (List.head walk.ReversePath) nfa
                 for next in nextEdges do
-                    yield {walk with Current = next; ReversePath = next::walk.ReversePath}
+                    yield {ReversePath = next::walk.ReversePath}
             }
         let initials = startIdxs
                        |> (sortedByToken nfa)
-                       |> Seq.map (fun start -> {Current = start; ReversePath = [start]})
+                       |> Seq.map (fun start -> {ReversePath = [start]})
         seq {
             let queue = initials |> ref
             while not(Seq.isEmpty !queue) do
