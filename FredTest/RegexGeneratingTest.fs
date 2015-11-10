@@ -1,6 +1,7 @@
 ﻿module Regex.Test.Generating
 
 open Fred
+open FsCheck
 open NUnit.Framework
 open Regex
 open Regex.Test.Extensions
@@ -12,7 +13,7 @@ type ``Drawing NFAs``() = // As a gross side effect, this also tests emptyNfa & 
         let expected = @"digraph {
 }
 "
-        let actual = draw {Edges = Map.empty; Starts = []}
+        let actual = draw {Edges = Map.empty; Starts = []; Finals = []}
         Assert.AreEqual(expected, actual)
     [<Test>]
     member __.``Single``() =
@@ -155,9 +156,35 @@ type ``Transforming to NFA``() =
         draw nfa |> printfn "%s"
         Assert.AreEqual(0, (edgeCount nfa))
     [<Test>]
+    member __.``(a|b)*``() =
+        let nfa = any ['a';'b'] |> Star |> r2n
+        any ['a';'b'] |> r2n |> draw |> printfn "%s"
+        draw nfa |> printfn "%s"
+        assertEdgesOnly [2,2; 2,1; 1,1; 1,2; 2,0; 1,0] nfa
+    [<Test>]
+    member __.``Star of deep union ((h(a|e)r)*)``() =
+        let ae = Union (Char 'a', Char 'e')
+        let haer = Cat (Char 'h', Cat (ae, (Char 'r')))
+        let p = Star haer
+        p |> dotify |> printfn "%s"
+        let nfa = p |> r2n
+        nfa |> draw |> printfn "%s"
+        assertEdgesOnly [4,3; 4,2; 3,1; 2,1; 1,4; 1,0] nfa
+    [<Test>]
+    member __.``(ab)*``() =
+        let nfa = Cat (Char 'a', Char 'b') |> Star |> r2n
+        draw nfa |> printfn "%s"
+        assertEdgesOnly [2,1; 1,0; 1,2] nfa
+    [<Test>]
     member __.``example 9``() =
         let nfa = example9
         draw nfa |> printfn "%s"
+    [<Test>]
+    member __.``works on random parsers``() =
+        let canDraw (p: Parser<char>) =
+            p |> r2n |> draw |> ignore
+            true // Getting here = success
+        Check.Quick canDraw
 
 [<Timeout(2000)>] // milliseconds
 [<TestFixture>]
@@ -213,35 +240,38 @@ type ``Generating``() =
                         [3; 2; 2; 2]
                         [3; 2; 2; 1; 0]
                        ]
+                       |> List.map List.rev // It's easier to read the paths from start -> end, but bfsPath returns paths in REVERSE order.
+        example9 |> draw |> printfn "%s"
         printfn "%A" expected
         bfsPath [3] nfa |> Seq.truncate 5 |> Seq.iter (fun s -> printfn "%A" s)
         let actual = nfa |> (bfsPath [3]) |> Seq.truncate (Seq.length expected) |> List.ofSeq |> List.map List.ofSeq
         listEqual expected actual
 //        bfsPath nfa |> Seq.iter (fun s -> printfn "%A" s)
     [<Test>]
-    member __.``Union yields union of subparsers' languages (finite)``() =
+    member __.``Union yields union of subparsers' languages (finite: (a|b)``() =
         let a = Union (Char 'a', Cat (Char 'a', Char 'a'))
         let b = Union (Char 'b', Cat (Char 'b', Char 'b'))
         let expected = [['a']; ['b']; ['a'; 'a']; ['b'; 'b']]
         expectedGen expected (Union (a,b))
     [<Test>]
-    member __.``Union yields union of subparsers' languages (infinite)``() =
-        let wordCount = 200
+    member __.``Union yields union of subparsers' languages (infinite: (a*|b*)``() =
         let a = Char 'a' |> Star
         let b = Char 'b' |> Star
         let expected = [[]; ['a']; ['b']; ['a';'a']; ['b';'b']; ['a';'a';'a']; ['b';'b';'b']]
         expectedGen expected (Union (a,b)) // <-- fails because TWO []s are generated!
     [<Test>]
-    member __.``Cat yields set catenation of subparsers' languages``() =
+    member __.``Cat yields set catenation of subparsers' languages (a*b*)``() =
         let a = Char 'a' |> Star
         let b = Char 'b' |> Star
-        let expected = [[]; ['a']; ['b']; ['a';'a']; ['a';'b']; ['b';'b']; ['a';'a';'a'];['a';'a';'b'];['a';'b';'b'];['b';'b';'b'];['a';'a';'b';'b']]
+        let expected = [[]; ['a']; ['b']; ['a';'a']; ['a';'b']; ['b';'b']; ['a';'a';'a'];['a';'a';'b'];['a';'b';'b'];['b';'b';'b'];['a';'a';'a';'a']]
         expectedGen expected (Cat (a,b))
     [<Test>]
-    member __.``Star yields Kleene closure of subparser's language``() =
+    member __.``Star yields Kleene closure of subparser's language ((a|b)*)``() =
         let ab = any ['a';'b']
         let abStar = Star ab
-        let expected = [[]; ['a']; ['b']; ['a';'a'];['b';'a'];['a';'b'];['b';'b'];['a';'a';'a']]
+        abStar |> dotify |> printfn "%s"
+        abStar |> r2n |> draw |> printfn "%s"
+        let expected = [[]; ['a']; ['b']; ['a';'a'];['a';'b'];['b';'a'];['b';'b'];['a';'a';'a']]
         expectedGen expected abStar
     [<Test>]
     member __.``Simple Cat``() =
