@@ -223,7 +223,7 @@ module Regex =
                                                              | Empty | Eps | Eps _ -> Eps
                                                              | _ -> Star childA)
 
-    // d returns the derivative of a parser of a CFL with respect to the input token c.
+    // d returns the derivative of a parser of a regular language with respect to the input token c.
     // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
     let rec d c = function
     | Empty                      -> Empty
