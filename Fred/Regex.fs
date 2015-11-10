@@ -304,62 +304,59 @@ module Regex =
         | Some key -> nfa.Edges |> Map.find key
         | None -> Seq.empty
 
-    type R2nResult<'a when 'a: comparison> = {Machine: NFA<'a>; FirstStates: Ident list; FinalStates: Ident list; NextIdent: Ident; Bypassable: bool}
+    type R2nResult<'a when 'a: comparison> = {Machine: NFA<'a>; NextIdent: Ident; Bypassable: bool}
     let rec r2n' (p: Parser<'a>) (i: Ident) (destinationStates: Ident list): R2nResult<'a> =
         // Add edges from stateIdx to each state in destStates
         let addDestEdges stateIdx destStates nfa =
             List.fold (fun machine state -> machine |> add (at stateIdx machine) (Some state)) nfa destStates
 
         match p, i, destinationStates with
-        | Empty, n, _  -> {Machine = emptyNfa; FirstStates = []; FinalStates = []; NextIdent = n; Bypassable = false}
+        | Empty, n, _  -> {Machine = emptyNfa; NextIdent = n; Bypassable = false}
 //        | Star Empty, n, _    // Can accept no input: gross way of writing Eps.
 //        | Star Eps, n, _      // Effectively Eps.
         | Star (Eps' _), n, _ // Can occur in partially derived parsers. While these are epsilon edges, we can't remove them from a parser, because they contain (partial) parse trees
         | Eps, n, _           // We quietly elide Eps/Eps' from the resulting NFA.
-        | Eps' _, n, _ -> {Machine = emptyNfa; FirstStates = []; FinalStates = []; NextIdent = n; Bypassable = true}
-        | Char c, n, dest -> {Machine = (emptyNfa |> add {Ident = n; Token = c} None) |> addDestEdges n dest
-                              FirstStates = [n]
-                              FinalStates = [n]
+        | Eps' _, n, _ -> {Machine = emptyNfa; NextIdent = n; Bypassable = true}
+        | Char c, n, dest -> {Machine = {((emptyNfa |> add {Ident = n; Token = c} None) |> addDestEdges n dest) with
+                                            Starts = [n]
+                                            Finals = [n]}
                               NextIdent = n + 1
                               Bypassable = false}
         | Union (x, y), n, ds ->
             let right = r2n' y n ds
             let left = r2n' x right.NextIdent ds
-            {Machine = merge left.Machine right.Machine
-             FirstStates = List.append right.FirstStates left.FirstStates
-             FinalStates = List.append right.FinalStates left.FinalStates
+            {Machine = {merge left.Machine right.Machine with
+                            Starts = List.append right.Machine.Starts left.Machine.Starts
+                            Finals = List.append right.Machine.Finals left.Machine.Finals}
              NextIdent = left.NextIdent
              Bypassable = right.Bypassable || left.Bypassable}
         | Cat (x, y), n, ds ->
             let second = r2n' y n ds
-            let first = r2n' x second.NextIdent second.FirstStates
-            {Machine = merge first.Machine second.Machine
-             FirstStates = first.FirstStates
-             FinalStates = second.FinalStates
+            let first = r2n' x second.NextIdent second.Machine.Starts
+            {Machine = {merge first.Machine second.Machine with
+                            Starts = first.Machine.Starts
+                            Finals = second.Machine.Finals}
              NextIdent = first.NextIdent
              Bypassable = first.Bypassable && second.Bypassable}
         | Star x, n, ds ->
             let inner = r2n' x n ds
             let mutable newMachine = inner.Machine
-            // VVV almost certainly wrong! We want to make ALL FINAL states
-            // in inner route to all start states in the result. This adds
-            // routes from ALL inner states.
-
+            // We want to make ALL FINAL states in inner route to all start states in the result.
             for newEdge in (destStateIdxs 0 inner.Machine) do // Direct reference to final token!
-                newMachine <- newMachine |> addDestEdges newEdge inner.FirstStates |> addDestEdges newEdge ds
-            {Machine = newMachine |> addDestEdges n inner.FirstStates |> addDestEdges n ds
-             FirstStates = List.append inner.FirstStates ds
-             FinalStates = List.append inner.FirstStates ds
+                newMachine <- newMachine |> addDestEdges newEdge inner.Machine.Starts |> addDestEdges newEdge ds
+            {Machine = {(newMachine |> addDestEdges n inner.Machine.Starts |> addDestEdges n ds) with
+                         Starts = List.append inner.Machine.Starts ds
+                         Finals = List.append inner.Machine.Finals ds}
              NextIdent = inner.NextIdent
              Bypassable = true}
 
     let r2n (r: Parser<'a>) : NFA<'a> =
         let terminatingState = {Ident = 0; Token = Unchecked.defaultof<'a>} // Direct reference to final token!
         let compactedParser = compact r // Remove junk like "Star Empty" or "Star Eps"
-        let result = r2n' compactedParser 1 [terminatingState.Ident]
+        let result = r2n' compactedParser 1 [terminatingState.Ident] // "1" because it's the successor to terminatingState.Ident
+        // r2n' doesn't add the terminating state because an Empty NFA has no edges (therefore no states)
         let machineWithTerminator = result.Machine |> add terminatingState None
-        let startStates = if result.Bypassable then List.append result.FirstStates [] else result.FirstStates
-        {machineWithTerminator with Starts = List.append result.Machine.Starts startStates}
+        machineWithTerminator
 
     let accept (ds: Ident seq): bool =
         ds |> Seq.exists (fun d -> d = 0) // Direct reference to final token!
