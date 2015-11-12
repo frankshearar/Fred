@@ -379,13 +379,16 @@ module Regex =
                        |> (sortedByToken nfa)
                        |> Seq.map (fun start -> {ReversePath = [start]})
         seq {
-            let queue = initials |> ref
-            while not(Seq.isEmpty !queue) do
-                let currentPath = Seq.head !queue
-                queue := Seq.skip 1 !queue
+            // Locally mutable queue = blazingly fast.
+            let queue = new System.Collections.Generic.List<Walk>();
+            queue.AddRange(initials)
+
+            while queue.Count > 0 do
+                let currentPath = queue.[0]
+                queue.RemoveAt(0)
                 yield currentPath.ReversePath
                 let nextPaths = nextSteps currentPath nfa
-                queue := Seq.append !queue nextPaths
+                queue.AddRange(nextPaths)
         }
 
     // Yield each node in nfa in breadth-first order.
@@ -424,31 +427,6 @@ module Regex =
         |> Seq.filter word
         |> Seq.map (toToken nfa)
         |> Seq.distinct
-
-    // generate generates every word in the language described by a parser p.
-    // It does so in a fair manner, in that the union of two parsers a and b
-    // will return words from a and b, in order.
-    // EXPONENTIAL TIME
-    let generateExp p =
-        let rec gen = function
-        | Empty       -> Seq.empty
-        | Eps
-        | Eps' _      -> seq { yield [] } // generate doesn't use the parse trees.
-        | Char c      -> seq { yield [c] }
-        | Union (a,b) -> interleave2 (gen a) (gen b)
-        | Cat (a,b)   -> seq {
-                              let seqA = gen a
-                              let seqB = gen b
-                              match Seq.isEmpty seqA, Seq.isEmpty seqB with
-                              | true, true
-                              | true, false
-                              | false, true  -> yield! Seq.empty
-                              | false, false -> yield! (allPairs seqA seqB (fun a b -> List.append a b)) }
-        | Star a      -> seq {
-                              yield! gen (Eps' (Set.singleton []))
-                              yield! gen a } // <-- This is wrong. See the generate-kleene-star-languages branch for explorations in fixing the bug.
-        Seq.distinct (gen p)
-
 
     // matches returns true if a parser matches the entire input.
     let rec matches p = function
