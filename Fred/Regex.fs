@@ -1,6 +1,7 @@
 ﻿namespace Fred
 
 // TODO:
+// Add a "reactive" API, so that as you process a stream of things you can Observe the matches.
 // Short-hand string so you can say /[a-z]+/ or whatever <-- ?? see puffnfresh's comments about "improve regex by removing stringly typing & parsing"
 // Reduction parsers apply a function to a match.
 // Wildcard - a parser that accepts any single token. Looks a lot like Char, turns into an Eps/Eps' on derivation.
@@ -15,6 +16,18 @@
 // Unions across more than 2 options:
 // * UnionN of list: 3x slower than folded Unions (for 5 elements)
 // * UnionN of array: 2x slower than folded Unions (for 5 elements)
+
+// Bugs in the paper?
+// section 5.2.1:
+//
+//     If e is (Sym c), the automaton has one state, which accepts symbol c; it is not
+//     bypassable. Its identifier is n; the next available identifier is n+1. The state’s moves
+//     go to the destination states ds.
+//     F(e) = {state n}
+//     b(e) = true
+//     r2n’ (Sym c) n ds = ([State n c ds], n+1, False)
+//
+// But then surely b(e) = false ?!
 
 module Regex =
     open System.Text // For StringBuilder
@@ -124,28 +137,32 @@ module Regex =
              if not (Seq.isEmpty remainder) then
                  yield! interleaveSeq (Seq.map (Seq.skip 1) remainder)}
 
-    // generate generates every word in the language described by a parser p.
-    // It does so in a fair manner, in that the union of two parsers a and b
-    // will return words from a and b, in order.
-    let generate p =
-        let rec gen = function
-        | Empty       -> Seq.empty
-        | Eps
-        | Eps' _      -> seq { yield [] } // generate doesn't use the parse trees.
-        | Char c      -> seq { yield [c] }
-        | Union (a,b) -> interleave2 (gen a) (gen b)
-        | Cat (a,b)   -> seq {
-                              let seqA = gen a
-                              let seqB = gen b
-                              match Seq.isEmpty seqA, Seq.isEmpty seqB with
-                              | true, true
-                              | true, false
-                              | false, true  -> yield! Seq.empty
-                              | false, false -> yield! (allPairs seqA seqB (fun a b -> List.append a b)) }
-        | Star a      -> seq {
-                              yield! gen (Eps' (Set.singleton []))
-                              yield! gen a } // <-- This is wrong. See the generate-kleene-star-languages branch for explorations in fixing the bug.
-        Seq.distinct (gen p)
+    let (|LT|EQ|GT|) (a, b) =
+        match compare a b with
+        | 0 -> EQ
+        | n when n < 0 -> LT
+        | _ -> GT
+
+    // |/ merges two ordered (according to the elements' compare) sequences
+    // such that resulting sequence is ordered (by the elements' compare).
+    // (I'd use (\/) like the original paper (McIlroy, Enumerating the Strings
+    // of Regular Languages), but no \s allowed!
+    let rec (|/) xs ys =
+         match Seq.isEmpty xs, Seq.isEmpty ys with
+         | true, true -> Seq.empty
+         | true, false -> ys
+         | false, true -> xs
+         | false, false ->
+            // Pulling out the tails in let bindings looks neater,
+            // but means we throw one of those tails away every
+            // time the comparison of heads is not EQ. |/ is used
+            // A LOT, so let's be efficient with some loss of beauty.
+            let x = Seq.head xs
+            let y = Seq.head ys
+            match x, y with
+            | LT -> seq { yield x; yield! (Seq.skip 1 xs) |/ ys              }
+            | EQ -> seq { yield x; yield! (Seq.skip 1 xs) |/ (Seq.skip 1 ys) }
+            | GT -> seq { yield y; yield!              xs |/ (Seq.skip 1 ys) }
 
     // exactlyEqual returns true if the only value that sequence yields - and only once - is value.
     // It's like value = Seq.exactlyOne seq, only doesn't throw an exception.
@@ -206,7 +223,7 @@ module Regex =
                                                              | Empty | Eps | Eps _ -> Eps
                                                              | _ -> Star childA)
 
-    // d returns the derivative of a parser of a CFL with respect to the input token c.
+    // d returns the derivative of a parser of a regular language with respect to the input token c.
     // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
     let rec d c = function
     | Empty                      -> Empty
@@ -218,6 +235,198 @@ module Regex =
     | Cat (a, b) when nullable a -> Union (d c b, Cat (d c a, b))
     | Cat (a, b)                 -> Cat (d c a, b)
     | Star a                     -> Cat (d c a, Star a)
+
+    type Ident = int
+    type State<'a> = {Ident: Ident; Token: 'a}
+    type NFA<'a when 'a: comparison> = {Edges: Map<State<'a>,Ident seq>; Starts: Ident list; Finals: Ident list}
+
+    let emptyNFA = Map.empty
+    // Which states in nfa have edges to destStateIdx?
+    let destStateIdxs (destStateIdx: Ident) nfa: Ident seq =
+        nfa.Edges
+        |> Map.toSeq
+        |> Seq.filter (fun (_,v) -> v |> Seq.exists (fun i -> i = destStateIdx))
+        |> Seq.map (fun edge -> (fst edge).Ident)
+
+    let emptyNfa = {Edges = Map.empty ; Starts = []; Finals = []}
+
+    let add (startState: State<'a>) (destState: Ident option) (nfa: NFA<'a>): NFA<'a> = // Add start state?
+        let maybeKey = Map.tryFindKey (fun k _ -> k = startState) nfa.Edges
+        match maybeKey with
+        | Some _ ->
+            // We've seen this start-of-edge before
+            match destState with
+            | Some d ->
+                let oldDest = Map.find startState nfa.Edges
+                let newDest = seq { yield! oldDest; yield d} |> Seq.distinct
+                {nfa with Edges = nfa.Edges |> Map.add startState newDest}
+            | None -> nfa
+        | None ->
+            // New start-of-edge
+            match destState with
+            | Some d -> {nfa with Edges = nfa.Edges |> Map.add startState (seq {yield d})}
+            | None   -> {nfa with Edges = nfa.Edges |> Map.add startState Seq.empty}
+
+    let merge nfa1 nfa2 =
+        {Edges = nfa1.Edges |> Map.toList |> List.fold (fun nfa (k,v) -> Map.add k v nfa) nfa2.Edges
+         Starts = List.append nfa1.Starts nfa2.Starts
+         Finals = List.append nfa1.Finals nfa2.Finals}
+
+    let addStartState ident nfa =
+        {nfa with Starts = ident :: nfa.Starts}
+
+    let draw nfa =
+        let draw' nfa (sb: StringBuilder) =
+            let edges = nfa.Edges |> Map.toList
+            edges
+            |> Seq.iter (fun (k,v) -> sb.AppendLine(sprintf "    %d [label=\"%A\"]" k.Ident k.Token) |> ignore)
+            edges
+            |> Seq.iter (fun (src,dests) ->
+                dests
+                |> Seq.iter (fun x -> sb.AppendLine(sprintf "    %d -> %d" src.Ident x) |> ignore))
+        let sb = new StringBuilder()
+        sb.AppendLine("digraph {") |> ignore
+        draw' nfa sb |> ignore
+        sb.AppendLine("}")
+        |> string
+
+    let at (index: Ident) (nfa: NFA<'a>): State<'a> =
+        nfa.Edges |> Map.tryFindKey (fun k _ -> k.Ident = index) |> Option.get
+    let allStates nfa =
+        nfa.Edges
+        |> Map.toList
+        |> List.map fst
+    let start nfa =
+        allStates nfa
+        |> List.maxBy (fun state -> state.Ident)
+    let edgesOf (index: Ident) (nfa: NFA<'a>) =
+        match nfa.Edges |> Map.tryFindKey (fun k _ -> k.Ident = index) with
+        | Some key -> nfa.Edges |> Map.find key
+        | None -> Seq.empty
+
+    type R2nResult<'a when 'a: comparison> = {Machine: NFA<'a>; NextIdent: Ident; Bypassable: bool}
+    let rec r2n' (p: Parser<'a>) (i: Ident) (destinationStates: Ident list): R2nResult<'a> =
+        // Add edges from stateIdx to each state in destStates
+        let addDestEdges stateIdx destStates nfa =
+            List.fold (fun machine state -> machine |> add (at stateIdx machine) (Some state)) nfa destStates
+
+        match p, i, destinationStates with
+        | Empty, n, _  -> {Machine = emptyNfa; NextIdent = n; Bypassable = false}
+//        | Star Empty, n, _    // Can accept no input: gross way of writing Eps.
+//        | Star Eps, n, _      // Effectively Eps.
+        | Star (Eps' _), n, _ // Can occur in partially derived parsers. While these are epsilon edges, we can't remove them from a parser, because they contain (partial) parse trees
+        | Eps, n, _           // We quietly elide Eps/Eps' from the resulting NFA.
+        | Eps' _, n, _ -> {Machine = emptyNfa; NextIdent = n; Bypassable = true}
+        | Char c, n, dest -> {Machine = {((emptyNfa |> add {Ident = n; Token = c} None) |> addDestEdges n dest) with
+                                            Starts = [n]
+                                            Finals = [n]}
+                              NextIdent = n + 1
+                              Bypassable = false}
+        | Union (x, y), n, ds ->
+            let right = r2n' y n ds
+            let left = r2n' x right.NextIdent ds
+            {Machine = {merge left.Machine right.Machine with
+                            Starts = List.append right.Machine.Starts left.Machine.Starts
+                            Finals = List.append right.Machine.Finals left.Machine.Finals}
+             NextIdent = left.NextIdent
+             Bypassable = right.Bypassable || left.Bypassable}
+        | Cat (x, y), n, ds ->
+            let second = r2n' y n ds
+            let first = r2n' x second.NextIdent second.Machine.Starts
+            {Machine = {merge first.Machine second.Machine with
+                            Starts = first.Machine.Starts
+                            Finals = second.Machine.Finals}
+             NextIdent = first.NextIdent
+             Bypassable = first.Bypassable && second.Bypassable}
+        | Star x, n, ds ->
+            let inner = r2n' x n ds
+            let mutable newMachine = inner.Machine
+            // We want to make ALL FINAL states in inner route to all start states in the result.
+            for newEdge in (destStateIdxs 0 inner.Machine) do // Direct reference to final token!
+                newMachine <- newMachine |> addDestEdges newEdge inner.Machine.Starts |> addDestEdges newEdge ds
+            {Machine = {(newMachine |> addDestEdges n inner.Machine.Starts |> addDestEdges n ds) with
+                         Starts = List.append inner.Machine.Starts ds
+                         Finals = List.append inner.Machine.Finals ds}
+             NextIdent = inner.NextIdent
+             Bypassable = true}
+
+    let r2n (r: Parser<'a>) : NFA<'a> =
+        let terminatingState = {Ident = 0; Token = Unchecked.defaultof<'a>} // Direct reference to final token!
+        let compactedParser = compact r // Remove junk like "Star Empty" or "Star Eps"
+        let result = r2n' compactedParser 1 [terminatingState.Ident] // "1" because it's the successor to terminatingState.Ident
+        // r2n' doesn't add the terminating state because an Empty NFA has no edges (therefore no states)
+        let machineWithTerminator = result.Machine |> add terminatingState None
+        machineWithTerminator
+
+    let accept (ds: Ident seq): bool =
+        ds |> Seq.exists (fun d -> d = 0) // Direct reference to final token!
+
+    type Walk = {ReversePath: Ident list}
+    // Yield a sequence of _paths_ through a NFA. The paths are REVERSED. This
+    // lets users determine, in constant time, the last node reached. (For example,
+    // checking acceptance of a word in an NFA representing a regular expression.)
+    let bfsPath (startIdxs: Ident seq) (nfa: NFA<'a>) =
+        let sortedByToken nfa idents =
+            idents
+            |> Seq.map (fun idx -> at idx nfa)
+            |> Seq.sortBy (fun state -> state.Token)
+            |> Seq.map (fun state -> state.Ident)
+        let nextSteps (walk: Walk) (nfa: NFA<'a>) =
+                edgesOf (List.head walk.ReversePath) nfa
+                |> (sortedByToken nfa)
+                |> Seq.map (fun next -> {ReversePath = next::walk.ReversePath})
+        let initials = startIdxs
+                       |> (sortedByToken nfa)
+                       |> Seq.map (fun start -> {ReversePath = [start]})
+        seq {
+            // Locally mutable queue = blazingly fast.
+            let queue = new System.Collections.Generic.List<Walk>();
+            queue.AddRange(initials)
+
+            while queue.Count > 0 do
+                let currentPath = queue.[0]
+                queue.RemoveAt(0)
+                yield currentPath.ReversePath
+                let nextPaths = nextSteps currentPath nfa
+                queue.AddRange(nextPaths)
+        }
+
+    // Yield each node in nfa in breadth-first order.
+    let bfsi (nfa: NFA<'a>) =
+        let nextSteps (nodeIdx: Ident) (nfa: NFA<'a>) =
+            edgesOf nodeIdx nfa
+        seq {
+                let queue = ref(Seq.singleton (start nfa).Ident)
+                while not(Seq.isEmpty !queue) do
+                    let currentIdx = Seq.head !queue
+                    queue := Seq.skip 1 !queue
+                    yield currentIdx
+                    let nextEdges = nextSteps currentIdx nfa
+                    queue := Seq.append !queue nextEdges
+            }
+
+    // generate generates every word in the language described by a parser p.
+    // It does so in a fair manner, in that the union of two parsers a and b
+    // will return words from a and b, in order.
+    let generate (p: Parser<'a>): 'a list seq =
+        let rec word path =
+            match path with
+            | 0::_ -> true
+            | _::_
+            | []    -> false
+        let toToken nfa path =
+            (match path with
+            | 0::xs -> xs
+            | _::_
+            | [] -> []) // Shouldn't be able to generate this path...
+            |> List.map (fun idx -> (at idx nfa).Token)
+            |> List.rev
+        let nfa = r2n p
+        nfa.Starts
+        |> (fun starts -> (bfsPath starts nfa))
+        |> Seq.filter word
+        |> Seq.map (toToken nfa)
+        |> Seq.distinct
 
     // matches returns true if a parser matches the entire input.
     let rec matches p = function

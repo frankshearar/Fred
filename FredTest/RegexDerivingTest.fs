@@ -4,7 +4,6 @@ open Fred
 open FsCheck
 open NUnit.Framework
 open Regex
-open Regex.Test.Extensions
 
 // For the purposes of these tests we use a collection of chars or ints. However,
 // Regex parsers are generic in their input type!
@@ -12,44 +11,44 @@ open Regex.Test.Extensions
 [<TestFixture>]
 type ``Deriving``() =
     [<Test>]
-    member x.``Empty is Empty``() =
+    member __.``Empty is Empty``() =
         let emptyIsAlwaysEmpty (x: char) =
             Empty = (d x Empty)
         Check.QuickThrowOnFailure emptyIsAlwaysEmpty
     [<Test>]
-    member x.``Eps is Empty``() =
+    member __.``Eps is Empty``() =
         let epsIsAlwaysEmpty (x: char) y =
             Empty = (d x (Eps' y))
         Check.QuickThrowOnFailure epsIsAlwaysEmpty
     [<Test>]
-    member x.``Char is Eps when a match``() =
+    member __.``Char is Eps when a match``() =
         let charDerivesToEpsForMatch (x: char) =
             Eps = (d x (Char x))
         Check.QuickThrowOnFailure charDerivesToEpsForMatch
     [<Test>]
-    member x.``Char is Empty when not a match``() =
+    member __.``Char is Empty when not a match``() =
         let charDerivesToEmptyForNonMatch (x: int) y =
             x <> y ==> (Empty = (d x (Char y)))
         Check.QuickThrowOnFailure charDerivesToEmptyForNonMatch
     [<Test>]
-    member x.``Cat with non-nullable first is derivative of first, followed by second``() =
+    member __.``Cat with non-nullable first is derivative of first, followed by second``() =
         let catWithNonNullablePrefix p1 p2 (x: char) =
             not (nullable p1) ==>
             (Cat (d x p1, p2) = d x (Cat (p1, p2)))
         Check.QuickThrowOnFailure catWithNonNullablePrefix
     [<Test>]
-    member x.``Cat with nullable first is either derivative of second, or derivative of first then second``() =
+    member __.``Cat with nullable first is either derivative of second, or derivative of first then second``() =
         let catWithNullablePrefix p1 p2 (x: char) =
             nullable p1 ==>
             (Union (d x p2, (Cat (d x p1, p2))) = d x (Cat (p1, p2)))
         Check.QuickThrowOnFailure catWithNullablePrefix
     [<Test>]
-    member x.``Union is Union of the derivatives of the subparsers``() =
+    member __.``Union is Union of the derivatives of the subparsers``() =
         let dOfUnionIsUnionOfDs p1 p2 (x: char) =
             Union (d x p1, d x p2) = d x (Union (p1, p2))
         Check.QuickThrowOnFailure dOfUnionIsUnionOfDs
     [<Test>]
-    member x.``Star 'peels off' a subparser and derives it``() =
+    member __.``Star 'peels off' a subparser and derives it``() =
         let dOfStarPeelsOffSubparser p (x: char) =
             Cat (d x p, Star p) = d x (Star p)
         Check.QuickThrowOnFailure dOfStarPeelsOffSubparser
@@ -68,51 +67,51 @@ type ``Deriving``() =
 [<TestFixture>]
 type ``Deriving parse trees``() =
     [<Test>]
-    member x.``Empty is Empty``() =
+    member __.``Empty is Empty``() =
         let emptyIsAlwaysEmpty (x: char) =
             Empty = (dP x Empty)
         Check.QuickThrowOnFailure emptyIsAlwaysEmpty
     [<Test>]
-    member x.``Eps is Empty``() =
+    member __.``Eps is Empty``() =
         let epsIsAlwaysEmpty (x: char) y =
             Empty = (dP x (Eps' y))
         Check.QuickThrowOnFailure epsIsAlwaysEmpty
     [<Test>]
-    member x.``Char is Eps' when a match``() =
+    member __.``Char is Eps' when a match``() =
         let charDerivesToEpsForMatch (x: char) =
             Eps' (set [[x]]) = (dP x (Char x))
         Check.QuickThrowOnFailure charDerivesToEpsForMatch
     [<Test>]
-    member x.``Char is Empty when not a match``() =
+    member __.``Char is Empty when not a match``() =
         let charDerivesToEmptyForNonMatch (x: int) y =
             x <> y ==> (Empty = (dP x (Char y)))
         Check.QuickThrowOnFailure charDerivesToEmptyForNonMatch
     [<Test>]
-    member x.``Cat with non-nullable first is derivative of first, followed by second``() =
+    member __.``Cat with non-nullable first is derivative of first, followed by second``() =
         let catWithNonNullablePrefix p1 p2 (x: char) =
             not (nullable p1) ==>
             (Cat (dP x p1, p2) = dP x (Cat (p1, p2)))
         Check.QuickThrowOnFailure catWithNonNullablePrefix
     [<Test>]
-    member x.``Cat with nullable first is either cat of set of partial parses with derivative of second, or derivative of first then second``() =
+    member __.``Cat with nullable first is either cat of set of partial parses with derivative of second, or derivative of first then second``() =
         let catWithNullablePrefix p1 p2 (x: char) =
             nullable p1 ==>
             let firstParseTrees = parseNull p1
             ((Union (Cat (Eps' firstParseTrees, dP x p2), (Cat (dP x p1, p2)))) = dP x (Cat (p1, p2)))
         Check.QuickThrowOnFailure catWithNullablePrefix
     [<Test>]
-    member x.``Union is Union of the derivatives of the subparsers``() =
+    member __.``Union is Union of the derivatives of the subparsers``() =
         let dOfUnionIsUnionOfDs p1 p2 (x: char) =
             Union (dP x p1, dP x p2) = dP x (Union (p1, p2))
         Check.QuickThrowOnFailure dOfUnionIsUnionOfDs
     [<Test>]
-    member x.``Star 'peels off' a subparser and derives it``() =
+    member __.``Star 'peels off' a subparser and derives it``() =
         let dOfStarPeelsOffSubparser p (x: char) =
             Cat (dP x p, Star p) = dP x (Star p)
         Check.QuickThrowOnFailure dOfStarPeelsOffSubparser
 // See the comment in dP's definition for why we can't yet uncomment this test
 //    [<Test>]
-//    member x.``Except for Char->Eps, both derivations are equal``() =
+//    member __.``Except for Char->Eps, both derivations are equal``() =
 //        let id = fun x -> x
 //        let idmerge = fun x a b -> x
 //        let parserToList p =

@@ -12,25 +12,25 @@ open Regex.Test.Extensions
 [<TestFixture>]
 type ``Interleaving of Seqs``() =
     [<Test>]
-    member x.``returns empty if both subseqs are empty``() =
+    member __.``returns empty if both subseqs are empty``() =
         listEqual [] (List.ofSeq (interleave [Seq.empty; Seq.empty]))
     [<Test>]
-    member x.``returns left items if right subseq is empty``() =
+    member __.``returns left items if right subseq is empty``() =
         interleave [Seq.ofList [1;2;3]; Seq.empty]
         |> List.ofSeq
         |> listEqual [1;2;3]
     [<Test>]
-    member x.``returns right items if left subseq is empty``() =
+    member __.``returns right items if left subseq is empty``() =
         interleave [Seq.empty; Seq.ofList [1;2;3]]
         |> List.ofSeq
         |> listEqual [1;2;3]
     [<Test>]
-    member x.``returns from both seqs if neither are empty``() =
+    member __.``returns from both seqs if neither are empty``() =
         interleave [Seq.ofList [1;2;3]; Seq.ofList [4;5;6]]
         |> List.ofSeq
         |> listEqual [1;4;2;5;3;6]
     [<Test>]
-    member x.``can use infinite sequences``() =
+    member __.``can use infinite sequences``() =
         let constantly v _ = v
         let numberCounts = interleave [Seq.initInfinite (constantly 1); Seq.initInfinite (constantly 2)]
                            |> Seq.take 1000
@@ -39,12 +39,12 @@ type ``Interleaving of Seqs``() =
         listEqual [1,500;2,500] numberCounts
 
     [<Test>]
-    member x.``handles empty sequences gracefully``() =
+    member __.``handles empty sequences gracefully``() =
         interleave [Seq.ofList [1;2;3]; Seq.empty; Seq.empty; Seq.ofList [4;5;6]]
         |> List.ofSeq
         |> listEqual [1;4;2;5;3;6]
     [<Test>]
-    member x.``returns all elements of all sequences``() =
+    member __.``returns all elements of all sequences``() =
         let allElemsReturned (lists: int list list) = // Why not int seq list? FsCheck chokes on generating seqs. See http://fscheck.codeplex.com/workitem/16785
             let left =
                 lists
@@ -61,16 +61,16 @@ type ``Interleaving of Seqs``() =
 [<TestFixture>]
 type ``Taking the product of Seqs``() =
     [<Test>]
-    member x.``when both are empty, is Seq.empty``() =
+    member __.``when both are empty, is Seq.empty``() =
         Assert.AreEqual(Seq.empty, (allPairs Seq.empty Seq.empty (+)))
     [<Test>]
-    member x.``when first is empty, is the second``() =
+    member __.``when first is empty, is the second``() =
         Assert.AreEqual([1;2;3], (allPairs Seq.empty [1;2;3] (+)))
     [<Test>]
-    member x.``when second is empty, is the first``() =
+    member __.``when second is empty, is the first``() =
         Assert.AreEqual([1;2;3], (allPairs [1;2;3] Seq.empty (+)))
     [<Test>]
-    member x.``returns all combinations of all elements of both non-empty sequences``() =
+    member __.``returns all combinations of all elements of both non-empty sequences``() =
         let cartesianProductHasExpectedLength listA listB = // Geneflect can't generate seqs, so take lists instead.
             (not (List.isEmpty listA) && not (List.isEmpty listB)) ==>
             let seqA = listA |> Seq.ofList
@@ -78,7 +78,7 @@ type ``Taking the product of Seqs``() =
             Seq.length (allPairs seqA seqB (fun x y -> 0)) = (Seq.length seqA) * (Seq.length seqB)
         Check.QuickThrowOnFailure cartesianProductHasExpectedLength
     [<Test>]
-    member x.``returns the non-empty sequence when the other sequence is empty``() =
+    member __.``returns the non-empty sequence when the other sequence is empty``() =
         listEqual [1;2;3] (allPairs [1;2;3] [] (+))
         listEqual [1;2;3] (allPairs [] [1;2;3] (+))
 //        let cartProdIsNonEmptySeq listA listB =
@@ -88,7 +88,7 @@ type ``Taking the product of Seqs``() =
 //                Seq.length (allPairs seqA seqB List.append) = (Seq.length seqA) + (Seq.length seqB) // empty = 0 length = additive identity
 //        Check.QuickThrowOnFailure cartProdIsNonEmptySeq
     [<Test>]
-    member x.``runs the function on all pairs``() =
+    member __.``runs the function on all pairs``() =
         let functionApplied (listA: int list) listB =
             (not (List.isEmpty listA) && not (List.isEmpty listB)) ==>
             let seqA = listA |> Seq.ofList
@@ -105,35 +105,35 @@ type ``Taking the product of Seqs``() =
 [<TestFixture>]
 type ``Testing exactlyEqual``() =
     [<Test>]
-    member x.``returns true for singleton seq with expected value``() =
+    member __.``returns true for singleton seq with expected value``() =
         let just1 = seq {yield 1}
         Assert.That(exactlyEqual just1 1)
     [<Test>]
-    member x.``returns false for singleton seq with unexpected value``() =
+    member __.``returns false for singleton seq with unexpected value``() =
         let just1 = seq {yield 1}
         Assert.False(exactlyEqual just1 2)
         let just2 = seq {yield 2}
         Assert.False(exactlyEqual just2 1)
     [<Test>]
-    member x.``returns false for empty sequences``() =
+    member __.``returns false for empty sequences``() =
         let alwaysFalse value =
             false = exactlyEqual Seq.empty value
         Check.QuickThrowOnFailure alwaysFalse
     [<Test>]
-    member x.``returns false for multi-item sequences``() =
+    member __.``returns false for multi-item sequences``() =
         let alwaysFalse value =
             let twoVals = seq { yield 1; yield 2}
             false = exactlyEqual twoVals value
         Check.QuickThrowOnFailure alwaysFalse
     [<Test>]
-    member x.``returns false for two-item sequences (first)``() =
+    member __.``returns false for two-item sequences (first)``() =
         let alwaysFalseForFirstVal pair =
             let s = match pair with
                     | a, b -> seq {yield a; yield b}
             false = exactlyEqual s (fst pair)
         Check.QuickThrowOnFailure alwaysFalseForFirstVal
     [<Test>]
-    member x.``returns false for two-item sequences (second)``() =
+    member __.``returns false for two-item sequences (second)``() =
         let alwaysFalseForSecondVal pair =
             let s = match pair with
                     | a, b -> seq {yield a; yield b}
