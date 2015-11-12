@@ -8,19 +8,20 @@ open Regex.Test.Extensions
 
 [<TestFixture>]
 type ``Drawing NFAs``() = // As a gross side effect, this also tests emptyNfa & add.
+    let addLineEnds (l: string list) =
+        System.String.Join(System.Environment.NewLine, l) + System.Environment.NewLine
     [<Test>]
     member __.``Empty``() =
-        let expected = @"digraph {
-}
-"
+        let expected = ["digraph {"
+                        "}"] |> addLineEnds
         let actual = draw {Edges = Map.empty; Starts = []; Finals = []}
         Assert.AreEqual(expected, actual)
     [<Test>]
     member __.``Single``() =
-        let expected = @"digraph {
-    0 [label=""'~'""]
-}
-"
+        let expected = ["digraph {"
+                        "    0 [label=\"'~'\"]"
+                        "}"] |> addLineEnds
+
         let actual = emptyNfa
                      |> add {Ident = 0; Token = '~'} None
                      |> addStartState 0
@@ -28,12 +29,11 @@ type ``Drawing NFAs``() = // As a gross side effect, this also tests emptyNfa & 
         Assert.AreEqual(expected, actual)
     [<Test>]
     member __.``ab``() =
-        let expected = @"digraph {
-    0 [label=""'a'""]
-    1 [label=""'b'""]
-    0 -> 1
-}
-"
+        let expected = ["digraph {"
+                        "    0 [label=\"'a'\"]"
+                        "    1 [label=\"'b'\"]"
+                        "    0 -> 1"
+                        "}"] |> addLineEnds
         let actual = emptyNfa
                      |> add {Ident = 0; Token = 'a'} (Some 1)
                      |> add {Ident = 1; Token = 'b'} None
@@ -42,18 +42,17 @@ type ``Drawing NFAs``() = // As a gross side effect, this also tests emptyNfa & 
         Assert.AreEqual(expected, actual)
     [<Test>]
     member __.``ab*a``() =
-        let expected = @"digraph {
-    0 [label=""'~'""]
-    1 [label=""'a'""]
-    2 [label=""'b'""]
-    3 [label=""'a'""]
-    1 -> 0
-    2 -> 1
-    2 -> 2
-    3 -> 1
-    3 -> 2
-}
-"
+        let expected = ["digraph {"
+                        "    0 [label=\"'~'\"]"
+                        "    1 [label=\"'a'\"]"
+                        "    2 [label=\"'b'\"]"
+                        "    3 [label=\"'a'\"]"
+                        "    1 -> 0"
+                        "    2 -> 1"
+                        "    2 -> 2"
+                        "    3 -> 1"
+                        "    3 -> 2"
+                        "}"] |> addLineEnds
         let actual =
             emptyNfa
             |> add {Ident = 0; Token = '~'} None
