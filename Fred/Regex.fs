@@ -279,7 +279,7 @@ module Regex =
         let draw' nfa (sb: StringBuilder) =
             let edges = nfa.Edges |> Map.toList
             edges
-            |> Seq.iter (fun (k,v) -> sb.AppendLine(sprintf "    %d [label=\"%A\"]" k.Ident k.Token) |> ignore)
+            |> Seq.iter (fun (k,_) -> sb.AppendLine(sprintf "    %d [label=\"%A\"]" k.Ident k.Token) |> ignore)
             edges
             |> Seq.iter (fun (src,dests) ->
                 dests
