@@ -109,6 +109,19 @@ module Regex =
     | Cat (a, b)                 -> Cat (dP c a, b)
     | Star a                     -> Cat (dP c a, Star a)
 
+    // d returns the derivative of a parser of a regular language with respect to the input token c.
+    // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
+    let rec d c = function
+    | Empty                      -> Empty
+    | Eps                        -> Empty
+    | Eps' _                     -> Empty
+    | Char x when x = c          -> Eps
+    | Char _                     -> Empty
+    | Union (a, b)               -> Union (d c a, d c b)
+    | Cat (a, b) when nullable a -> Union (d c b, Cat (d c a, b))
+    | Cat (a, b)                 -> Cat (d c a, b)
+    | Star a                     -> Cat (d c a, Star a)
+
     // interleave returns a sequence that draws elements from each of the sequences in turn.
     // As each sequence empties, interleave forgets about the sequence.
     // For instance interleave [Seq.ofList [1;2;3]; Seq.ofList [4;5;6]; Seq.empty; Seq.ofList [10;11]
@@ -218,18 +231,6 @@ module Regex =
                      | Star (Eps' _)          -> Eps
                      | Star _                 -> x)
 
-    // d returns the derivative of a parser of a regular language with respect to the input token c.
-    // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.
-    let rec d c = function
-    | Empty                      -> Empty
-    | Eps                        -> Empty
-    | Eps' _                     -> Empty
-    | Char x when x = c          -> Eps
-    | Char _                     -> Empty
-    | Union (a, b)               -> Union (d c a, d c b)
-    | Cat (a, b) when nullable a -> Union (d c b, Cat (d c a, b))
-    | Cat (a, b)                 -> Cat (d c a, b)
-    | Star a                     -> Cat (d c a, Star a)
 
     type Ident = int
     type State<'a> = {Ident: Ident; Token: 'a}
