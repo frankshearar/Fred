@@ -176,52 +176,47 @@ module Regex =
                 | false -> false
                 | true  -> v = value
 
-    // postfixWalk walks a regex parser in depth first order, running a function f on each
-    // parser. postfixWalk applies the merge parameter when exiting a subtree, takes a
-    // parent node and a pair of _possibly new_ child nodes.
-    // (We pretend that Star has a second child, always Empty, to avoid passing around
-    // multiple merge-like functions. The alternative - use a parent + list of children
-    // as signature - means throwing away arity protection.)
-    let rec postfixWalk f merge p =
+    // map walks a regex parser in depth first order, running a function f on each
+    // parser.
+    let rec map f p =
+        printfn "walking %A" p
         match p with
         | Empty
         | Eps
         | Eps' _
         | Char _      -> f p
-        | Cat (a,b)   -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
-        | Union (a,b) -> merge p (postfixWalk f merge a) (postfixWalk f merge b)
-        | Star a      -> merge p (postfixWalk f merge a) Empty // Stinky hack so that we only need one merge function, taking two children.
+        | Cat (a,b)   -> f <| Cat (map f a, map f b)
+        | Union (a,b) -> f <| Union (map f a, map f b)
+        | Star a      -> f <| Star (map f a)
 
     // compact removes from a parser those subtrees that can no longer contribute to constructing parses.
     // We can remove Eps nodes, but not Eps' nodes. The latter contain partial parses, so removing them
     // means losing information.
     // You can only remove Eps subparsers from a Union when both subparsers are Eps, because Union (a, Eps)
     // means "the language defined by a, or the empty string". You _could_ remove the Eps if a was nullable,
-    // but nullable is O(n) already, so optimising for smallest parser possible means taking longer.
+    // but nullable is O(n) already, so optimising for the smallest parser possible means taking longer.
     let compact p =
-        p |>
-        postfixWalk (fun x -> x)
-                    (fun parent childA childB ->
-                                                 match parent with
-                                                 | Empty | Eps | Eps' _ | Char _ -> parent // Effectively a no-op
-                                                 // TODO: Compact Cat (Eps' a, Eps' b) to something like Eps' (a@b)
-                                                 // Easiest done with a Red parser.
-                                                 | Cat _ -> match childA,childB with
-                                                            | Empty, _     -> Empty
-                                                            | _, Empty     -> Empty
-                                                            | Eps, Eps     -> Eps
-                                                            | Eps, _       -> childB
-                                                            | _, Eps       -> childA
-                                                            | _            -> Cat (childA, childB)
-                                                 | Union _ -> match childA,childB with
-                                                              | Empty, Empty -> Empty
-                                                              | Empty, _     -> childB
-                                                              | _,     Empty -> childA
-                                                                                // This also compacts Union (Eps,Eps) -> Eps
-                                                              | _            -> if childA = childB then childA else Union (childA, childB)
-                                                 | Star _ -> match childA with // Note we ignore childB.
-                                                             | Empty | Eps | Eps _ -> Eps
-                                                             | _ -> Star childA)
+        p
+        |> map (fun x ->
+                     match x with
+                     | Empty | Eps | Eps' _ | Char _ -> x
+                     // TODO: Compact Cat (Eps' a, Eps' b) to something like Eps' (a@b)
+                     // Easiest done with a Red parser.
+                     | Cat (Empty,_)
+                     | Cat (_, Empty)         -> Empty
+                     | Cat (Eps,Eps)          -> Eps
+                     | Cat (Eps, b)           -> b
+                     | Cat (a, Eps)           -> a
+                     | Cat _                  -> x
+                     | Union (Empty,Empty)    -> Empty
+                     | Union (Empty,b)        -> b
+                     | Union (a, Empty)       -> a
+                     | Union (a,b) when a = b -> a // This also compacts Union (Eps,Eps) -> Eps
+                     | Union _                -> x
+                     | Star Empty
+                     | Star Eps
+                     | Star (Eps' _)          -> Eps
+                     | Star _                 -> x)
 
     // d returns the derivative of a parser of a regular language with respect to the input token c.
     // That is, d returns a parser that accepts _the rest of the input except for the prefix token c_.

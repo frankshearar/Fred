@@ -113,10 +113,9 @@ type ``Deriving parse trees``() =
 //    [<Test>]
 //    member __.``Except for Char->Eps, both derivations are equal``() =
 //        let id = fun x -> x
-//        let idmerge = fun x a b -> x
 //        let parserToList p =
 //            let acc = ref []
-//            postfixWalk (fun x -> acc := x::(!acc); x) idmerge p |> ignore
+//            map (fun x -> acc := x::(!acc); x) p |> ignore
 //            !acc
 //        let nearlyEqual a b =
 //            let xs = parserToList a
