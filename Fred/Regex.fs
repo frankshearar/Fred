@@ -204,35 +204,37 @@ module Regex =
         | Union (a,b) -> f <| Union (map f a, map f b)
         | Star a      -> f <| Star (map f a)
 
+    let compactFn p =
+        match p with
+        | Empty | Eps | Eps' _ | Char _ -> p
+        // TODO: Compact Cat (Eps' a, Eps' b) to something like Eps' (a@b)
+        // This will turn Cat (Eps' (set [['a']]), Eps' (set [['b']])) into Eps' (set [['a';'b']])
+        // Easiest done with a Red parser.
+        | Cat (Empty,_)
+        | Cat (_, Empty)         -> Empty
+        | Cat (Eps,Eps)          -> Eps
+        | Cat (Eps, b)           -> b
+        | Cat (a, Eps)           -> a
+        | Cat (Eps' _, Eps' _)   -> Eps' (parseNull p)
+        | Union (Empty,Empty)    -> Empty
+        | Union (Empty,b)        -> b
+        | Union (a, Empty)       -> a
+        | Union (Eps' _, Eps' _) -> Eps' (parseNull p)
+        | Union (a,b) when a = b -> a // This also compacts Union (Eps,Eps) -> Eps
+        | Star Empty
+        | Star Eps
+        | Star (Eps' _)          -> Eps
+        | Cat _
+        | Union _
+        | Star _                 -> p
+
     // compact removes from a parser those subtrees that can no longer contribute to constructing parses.
     // We can remove Eps nodes, but not Eps' nodes. The latter contain partial parses, so removing them
     // means losing information.
     // You can only remove Eps subparsers from a Union when both subparsers are Eps, because Union (a, Eps)
     // means "the language defined by a, or the empty string". You _could_ remove the Eps if a was nullable,
     // but nullable is O(n) already, so optimising for the smallest parser possible means taking longer.
-    let compact p =
-        p
-        |> map (fun x ->
-                     match x with
-                     | Empty | Eps | Eps' _ | Char _ -> x
-                     // TODO: Compact Cat (Eps' a, Eps' b) to something like Eps' (a@b)
-                     // Easiest done with a Red parser.
-                     | Cat (Empty,_)
-                     | Cat (_, Empty)         -> Empty
-                     | Cat (Eps,Eps)          -> Eps
-                     | Cat (Eps, b)           -> b
-                     | Cat (a, Eps)           -> a
-                     | Cat _                  -> x
-                     | Union (Empty,Empty)    -> Empty
-                     | Union (Empty,b)        -> b
-                     | Union (a, Empty)       -> a
-                     | Union (a,b) when a = b -> a // This also compacts Union (Eps,Eps) -> Eps
-                     | Union _                -> x
-                     | Star Empty
-                     | Star Eps
-                     | Star (Eps' _)          -> Eps
-                     | Star _                 -> x)
-
+    let compact p = map compactFn p
 
     type Ident = int
     type State<'a> = {Ident: Ident; Token: 'a}
