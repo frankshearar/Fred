@@ -104,6 +104,8 @@ module Regex =
                                     // part of the Union because it doesn't build parse
                                     // trees. Annoying that I don't know how to remove the
                                     // duplication of the rest of the functions!
+                                    // TODO: Maybe write dP, d as "named anonymous recursives",
+                                    // pull commonality into separate same thing, and >> them?
     | Cat (a, b) when nullable a -> Union (Cat (Eps' (parseNull a), dP c b),
                                            Cat (dP c a, b))
     | Cat (a, b)                 -> Cat (dP c a, b)
