@@ -194,7 +194,6 @@ module Regex =
     // map walks a regex parser in depth first order, running a function f on each
     // parser.
     let rec map f p =
-        printfn "walking %A" p
         match p with
         | Empty
         | Eps
