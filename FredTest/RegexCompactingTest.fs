@@ -50,7 +50,8 @@ type ``Compacting``() =
     [<Test>]
     member __.``does not remove nullable trailing subparsers with partial parse trees``() =
         let p = (Cat (Char 'a', Cat ((Eps' (set [[]])), Cat ((Eps' (set [[]])), (Eps' (set [[]]))))))
-        parserEqual p (compact p)
+        // Compaction "coalesces" the Eps' nodes, but doesn't remove the final nullable coalesced node
+        parserEqual (Cat (Char 'a', Eps' (set [[]]))) (compact p)
     [<Test>]
     member __.``Nothing then something is something``() =
         parserEqual (Char 'a') (compact (Cat (Eps, Char 'a')))
@@ -72,6 +73,12 @@ type ``Compacting``() =
     [<Test>]
     member __.``compacts sequences of parsers``() =
         parserEqual (Cat (Char 'a', Char 'b')) (compact (Cat (Cat (Eps, Char 'a'), Cat(Eps, Char 'b'))))
+    [<Test>]
+    member __.``of a Cat of Eps' parsers combines the Eps' parsers``() =
+        parserEqual (Eps' (set [['a';'b']])) (compact (Cat (Eps' (set [['a']]), Eps' (set [['b']]))))
+    [<Test>]
+    member __.``of a Union of Eps' parsers combines the Eps' parsers``() =
+        parserEqual (Eps' (set [['a'];['b']])) (compact (Union (Eps' (set [['a']]), Eps' (set [['b']]))))
     [<Test>]
     member __.``of Star of Eps is Eps``() =
         parserEqual Eps (compact (Star Eps))
