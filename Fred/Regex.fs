@@ -580,17 +580,17 @@ module Regex =
              CurrentParsers = parsers
              Parses = parses}
         else
-            let x = Seq.head input
-            let xs = Seq.skip 1 input
-            let endingParsers, rest = parsers
-                                        |> reject empty
-                                        |> List.partition (fun p -> dP x p |> empty)
-            let newParsers = (match (star baseParser, rest) with
+            let head = Seq.head input
+            let rest = Seq.skip 1 input
+            let endingParsers, busyParsers = parsers
+                                             |> reject empty
+                                             |> List.partition (fun p -> dP head p |> empty)
+            let newParsers = (match (star baseParser, busyParsers) with
                                 | false, []
                                 | false, _::_
-                                | true,  [] -> baseParser::rest // Add a new parser for non-maximal munchers
-                                | true,  _::_ -> rest)          // Otherwise, just keep the old one ticking along.
-                                |> List.map (fun p -> dP x p)
+                                | true,  [] -> baseParser::busyParsers // Add a new parser for non-maximal munchers
+                                | true,  _::_ -> busyParsers)          // Otherwise, just keep the old one ticking along.
+                                |> List.map (fun p -> dP head p)
                                 |> List.map compact
                                 |> reject empty
             let maximalParses = endingParsers
@@ -599,11 +599,11 @@ module Regex =
                                 |> Seq.append parses    // And add the new parses to the pile.
                                                         // Don't dedupe here, because duplicate parses
                                                         // will start from a new point in the input!
-            let newParses = rest
+            let newParses = busyParsers
                             |> reject star
                             |> gatherParses
                             |> Seq.append maximalParses
-            resumableFind {Parser = baseParser; CurrentParsers = newParsers; Parses = newParses} xs
+            resumableFind {Parser = baseParser; CurrentParsers = newParsers; Parses = newParses} rest
 
     // finishFind finishes off a resumable find: now that you have no more
     // input, what are the final parse trees?
