@@ -40,12 +40,14 @@
   <PropertyGroup>
     <FSharpSdkVer Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')">3.0</FSharpSdkVer>
     <FSharpSdkVer Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.1\Framework\v4.0\Microsoft.FSharp.Targets')">3.1</FSharpSdkVer>
+    <FSharpSdkVer Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\4.0\Framework\v4.0\Microsoft.FSharp.Targets')">4.0</FSharpSdkVer>
     <FSharpTargetsPath>$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\$(FSharpSdkVer)\Framework\v4.0\Microsoft.FSharp.Targets</FSharpTargetsPath>
   </PropertyGroup>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
-    <None Include="packages.config" />
     <Compile Include="TestExtensions.fs" />
+    <Compile Include="ContextFreeTests.fs" />
+    <Compile Include="ContextFreeNullabilityTest.fs" />
     <Compile Include="RegexTests.fs" />
     <Compile Include="RegexCompactingTest.fs" />
     <Compile Include="RegexDerivingTest.fs" />
@@ -54,12 +56,22 @@
     <Compile Include="RegexNullabilityTest.fs" />
     <Compile Include="RegexParseTrees.fs" />
     <Compile Include="RegexSeqExtensionsTest.fs" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="Aether">
+      <HintPath>..\packages\Aether.8.2.0\lib\net45\Aether.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="FsCheck">
       <HintPath>..\packages\FsCheck.0.9.4.0\lib\net40-Client\FsCheck.dll</HintPath>
     </Reference>
-    <Reference Include="FSharp.Core, Version=$(TargetFSharpCoreVersion), Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+    <Reference Include="FSharp.Core">
+      <HintPath>..\packages\FSharp.Core.4.2.3\lib\net45\FSharp.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Hekate">
+      <HintPath>..\packages\Hekate.3.2.1\lib\net45\Hekate.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="nunit.framework">

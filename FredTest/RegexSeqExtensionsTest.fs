@@ -1,4 +1,4 @@
-﻿module Regex.Test.SeqExtensions
+﻿module Test.SeqExtensions
 
 open Fred
 open FsCheck
