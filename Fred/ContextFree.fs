@@ -62,8 +62,6 @@ module ContextFree =
         new Parser<_,_>(Graph.empty |> Graph.Nodes.add (index, typ), index)
 
     let cat (a: Parser<_,_>) (b: Parser<_,_>) =
-        let aIndex = nextIndex()
-        let bIndex = nextIndex()
         let catIndex = nextIndex()
         let graph =
             a.Graph
