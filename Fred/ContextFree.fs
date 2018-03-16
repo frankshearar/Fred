@@ -236,8 +236,7 @@ module ContextFree =
         let cache = ref Map.empty
         let hasChanged = new System.Threading.ThreadLocal<bool>()
         let running = new ThreadLocal<bool>()
-        let rec f (x: Parser<_,_>) =
-            printfn "f %A" (x.Kind)
+        let rec f (x: 'a) =
             let isCached = Map.containsKey x !cache
             let cached = match Map.tryFind x !cache with
                          | Some a -> a
