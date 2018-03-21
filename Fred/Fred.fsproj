@@ -45,6 +45,7 @@
     <Reference Include="System" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Sequences.fs" />
     <Compile Include="Regex.fs" />
     <Compile Include="ContextFree.fs" />
     <Compile Include="RegularParser.fs" />

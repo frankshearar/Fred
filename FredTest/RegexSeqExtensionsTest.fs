@@ -3,7 +3,7 @@
 open Fred
 open FsCheck
 open NUnit.Framework
-open Regex
+open Sequences
 open Regex.Test.Extensions
 
 // For the purposes of these tests we use a collection of chars or ints. However,

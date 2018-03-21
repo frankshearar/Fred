@@ -53,6 +53,8 @@
   <ItemGroup>
     <Compile Include="TestExtensions.fs" />
     <Compile Include="ContextFreeTests.fs" />
+    <Compile Include="ContextFreeDerivingTest.fs" />
+    <Compile Include="ContextFreeEqualityTests.fs" />
     <Compile Include="ContextFreeNullabilityTest.fs" />
     <Compile Include="RegexTests.fs" />
     <Compile Include="RegexCompactingTest.fs" />

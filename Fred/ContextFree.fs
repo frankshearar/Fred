@@ -3,16 +3,105 @@
 // NOTE WELL: At the moment this is _very much_ a work in progress. Stuff _does not work_.
 
 module ContextFree =
+    open Fred.Sequences
     open Hekate
     open System
     open System.Text
 
+    // fix uses Kleene's fixed-point theorem to calculate the fixpoint of a set of recursive equations, body:
+    // Given a monotone function f, walk the chain
+    //     bottom <= f(bottom) <= f(f(bottom)) <= f(f(f(bottom) <= ... f^n(bottom) <= ... <= lfp(f)
+    // until we hit the least fixed point (which Kleene assures us does exist).
+    // Since we have a set of mutually recursive equations, we need to track
+    //   * the last f^k(x) (obviously)
+    //   * the new value f^(k+1)(x)
+    //   * the "nodes" in the search graph we have already visited (because of potential cycles)
+    //
+    // More-or-less word-for-word translation of Matt Might's define/fix, from his dparse.rkt library.
+    // We use ref cells; the Racket version uses parameters. These MAY be like dynamic variables?!
+    // body represents the recursive function whose fixpoint we will return.
+    open System.Threading
+    let fix (body: ('a -> 'b) -> ('a -> 'b)) (bottom: 'b): ('a -> 'b) =
+        let visited = new ThreadLocal<Set<'a>>()
+        let cache = ref Map.empty
+        let hasChanged = new System.Threading.ThreadLocal<bool>()
+        let running = new ThreadLocal<bool>()
+        let rec f (x: 'a) =
+            let isCached = Map.containsKey x !cache
+            let cached = match Map.tryFind x !cache with
+                         | Some a -> a
+                         | None -> bottom
+            let run = running.Value
+            if isCached && not run then
+                cached
+            elif run && (Set.contains x visited.Value) then
+                if isCached then cached else bottom
+            elif run then
+                visited.Value <- Set.add x visited.Value
+                let newVal = body f x // body, 'a -> 'b, is applied with an 'a to yield an 'b
+                if newVal <> cached then
+                    hasChanged.Value <- true
+                    cache := Map.add x newVal !cache
+                newVal
+            elif not isCached && not run then
+                let mutable v = bottom
+                hasChanged.Value <- true
+                running.Value <- true
+                while hasChanged.Value do
+                    hasChanged.Value <- false
+                    visited.Value <- Set.empty
+                    v <- f x
+                v
+            else failwith "How'd we end up here??"
+        f
+
+    let fix2 (body: ('a -> 'b -> 'result) -> ('a -> 'b -> 'result)) (bottom: 'result): ('a -> 'b -> 'result) =
+        let visited = new ThreadLocal<Set<'a * 'b>>()
+        let cache = ref Map.empty
+        let hasChanged = new System.Threading.ThreadLocal<bool>()
+        let running = new ThreadLocal<bool>()
+        let rec f (x: 'a) (y: 'b): 'result =
+            let isCached = Map.containsKey (x, y) !cache
+            let cached = match Map.tryFind (x, y) !cache with
+                         | Some a -> a
+                         | None -> bottom
+            let run = running.Value
+            if isCached && not run then
+                cached
+            elif run && (Set.contains (x, y) visited.Value) then
+                if isCached then cached else bottom
+            elif run then
+                visited.Value <- Set.add (x, y) visited.Value
+                let newVal = body f x y // body, 'a -> 'b -> 'result, is applied with an 'a and a 'b to yield a 'result
+                if newVal <> cached then
+                    hasChanged.Value <- true
+                    cache := Map.add (x, y) newVal !cache
+                newVal
+            elif not isCached && not run then
+                let mutable v = bottom
+                hasChanged.Value <- true
+                running.Value <- true
+                while hasChanged.Value do
+                    hasChanged.Value <- false
+                    visited.Value <- Set.empty
+                    v <- f x y
+                v
+            else failwith "How'd we end up here??"
+        f
+
     // The kinds of reductions we allow on parses. A discriminated union
     // because arrow types ('a -> 'b) aren't comparable.
     type Reduction<'a, 'b> =
-        | Id
+        | Func of string
 
-    let id(): Reduction<'a,'a> = Id
+    let id(): Reduction<'a,'a> = Func "id"
+
+    let run (f: Reduction<'a,'b>) a =
+        match f with
+        | Func name ->
+            match name with
+            | "id" -> a
+            | _ -> failwith (sprintf "Unrecognized Reduction: %A" f)
 
     type ParserType<'a , 'b> when 'a: comparison and 'b: comparison =
         | Empty                    // The non-matching parser. The error state.
@@ -39,7 +128,44 @@ module ContextFree =
                 match o with
                 | :? Parser<'a, 'b> as y -> compare (x.Graph, x.Index) (y.Graph, y.Index)
                 | _ -> -1
-        override x.Equals(y: obj) = (x :> IComparable).CompareTo(y) = 0
+        member private a.equal b =
+            let childrenEq recur xs ys =
+                List.zip xs ys
+                |> List.fold (fun acc (x, y) -> acc && recur x y) true
+            let children (p: Parser<_,_>) =
+                Graph.Nodes.successors p.Index (p.Graph)
+                |> Option.map (fun succs -> List.map (fun succ -> new Parser<_,_>(p.Graph, fst succ)) succs)
+                |> Option.defaultValue List.empty
+            let eq recur (a: Parser<_,_>) (b: Parser<_,_>): bool =
+                match a.Kind, b.Kind with
+                | Char x,  Char y  -> x = y
+                | Empty,   Empty   -> true
+                | Eps,     Eps     -> true
+                | Eps' xs, Eps' ys -> xs = ys
+                | Red f,   Red g   -> childrenEq recur (children a) (children b)
+                                      &&
+                                      f = g
+                | Ref,     Ref     -> childrenEq recur (children a) (children b)
+                | Plus,    Plus
+                | Star,    Star
+                | Cat,     Cat     -> childrenEq recur (children a) (children b)
+                | Union,   Union   ->
+                    let aChildren = children a
+                    let bChildren = children b
+                    let inOrderEq = childrenEq recur aChildren bChildren
+                    let result = if inOrderEq then
+                                    // (union a b) = (union a b)
+                                    inOrderEq
+                                 else
+                                    // (union a b) = (union b a)
+                                    childrenEq recur aChildren (List.rev bChildren)
+                    result
+                | _ -> false
+            (fix2 eq) true a b
+        override x.Equals(y: obj) =
+            match y with
+            | :? Parser<'a,'b> as y1 -> x.equal y1
+            | _ -> false
         override x.GetHashCode() = x.Graph.GetHashCode() ^^^ x.Index.GetHashCode() ^^^ x.Kind.GetHashCode()
 
     let private currentIndex = ref 0
@@ -145,7 +271,6 @@ module ContextFree =
             result)
         |> List.fold (fun (builder: StringBuilder) nodeString -> builder.AppendLine nodeString) builder
         |> ignore
-        marks |> Seq.iter (fun kvp -> printfn ">>> %A -> %A" kvp.Key kvp.Value)
         Graph.Edges.toList p.Graph
         |> List.map (fun (startNode, endNode, label) ->
             let s = marks.[startNode]
@@ -209,62 +334,6 @@ module ContextFree =
             | None -> failwith (sprintf "Could not find the %A node in the graph!" p.Kind)
         | _ -> invalidArg "p" (sprintf "You can only call inner on a Red, Ref, Plus or Star, not a %A" p.Kind)
 
-    let memoize = fun f -> fun f' -> fun p ->
-        let cache = ref Map.empty<int, int>
-        match Map.tryFind p !cache with
-        | Some v -> v
-        | None ->
-            let result = f f' p
-            cache := Map.add p result !cache
-            result
-
-    // fix uses Kleene's fixed-point theorem to calculate the fixpoint of a set of recursive equations, body:
-    // Given a monotone function f, walk the chain
-    //     bottom <= f(bottom) <= f(f(bottom)) <= f(f(f(bottom) <= ... f^n(bottom) <= ... <= lfp(f)
-    // until we hit the least fixed point (which Kleene assures us does exist).
-    // Since we have a set of mutually recursive equations, we need to track
-    //   * the last f^k(x) (obviously)
-    //   * the new value f^(k+1)(x)
-    //   * the "nodes" in the search graph we have already visited (because of potential cycles)
-    //
-    // More-or-less word-for-word translation of Matt Might's define/fix, from his dparse.rkt library.
-    // We use ref cells; the Racket version uses parameters. These MAY be like dynamic variables?!
-    // body represents the recursive function whose fixpoint we will return.
-    open System.Threading
-    let fix (body: ('a -> 'b) -> ('a -> 'b)) (bottom: 'b): ('a -> 'b) =
-        let visited = new ThreadLocal<Set<'a>>()
-        let cache = ref Map.empty
-        let hasChanged = new System.Threading.ThreadLocal<bool>()
-        let running = new ThreadLocal<bool>()
-        let rec f (x: 'a) =
-            let isCached = Map.containsKey x !cache
-            let cached = match Map.tryFind x !cache with
-                         | Some a -> a
-                         | None -> bottom
-            let run = running.Value
-            if isCached && not run then
-                cached
-            elif run && (Set.contains x visited.Value) then
-                if isCached then cached else bottom
-            elif run then
-                visited.Value <- Set.add x visited.Value
-                let newVal = body f x // body, 'a -> 'b, is applied with a 'b to yield an 'a
-                if newVal <> cached then
-                    hasChanged.Value <- true
-                    cache := Map.add x newVal !cache
-                newVal
-            elif not isCached && not run then
-                let mutable v = bottom
-                hasChanged.Value <- true
-                running.Value <- true
-                while hasChanged.Value do
-                    hasChanged.Value <- false
-                    visited.Value <- Set.empty
-                    v <- f x
-                v
-            else failwith "How'd we end up here??"
-        f
-
     let private print f recur (x: Parser<_,_>) =
         printfn "print >>"
         let result = f recur x
@@ -288,8 +357,81 @@ module ContextFree =
     // TODO: add cache as parameter for application-level control
     // nullable answers the question "does this language accept the empty string?"
     let nullable p =
-        let what = print isNullable
-        fix what false p
+        fix (print isNullable) false p
+
+//    let rec D expected = function
+//        | Empty -> Empty
+//        | Eps _ -> Empty
+//        | Char c when c = expected -> Eps c
+//        | Char _ -> Empty
+//        | Union (a, b) -> Union (D expected a, D expected b)
+//        | Cat (a, b) when nullable a -> b
+//        | Cat (a, b) -> Cat (D expected a, b)
+//        | Rep a -> Cat (D expected a, Rep a)
+//        | Ref a -> Ref (ref (D expected !a))
+
+
+    let private d_ c recur (p: Parser<_,_>): Parser<_,_> =
+        match snd (Graph.Nodes.find p.Index p.Graph) with
+        | Empty  -> p
+        | Eps    -> empty()
+        | Eps' _ -> empty()
+        | Char x -> if x = c then eps() else empty()
+        | Union  -> union (recur (left p)) (recur (right p))
+        | Cat    ->
+            let a = first p
+            let b = second p
+            if nullable a then b else cat (recur a) b
+        | Red f  -> red (recur (inner p)) f
+        | Ref    -> p
+        | Plus   -> cat (recur (inner p)) (star (inner p))
+        | Star   -> cat (recur (inner p)) p
+
+    let d c p =
+        fix (d_ c) (empty()) p
+
+    let parseNull_ recur (p: Parser<_,_>) =
+        match snd (Graph.Nodes.find p.Index p.Graph) with
+        | Empty
+        | Eps -> Set.empty
+        | Eps' parseTrees -> parseTrees
+        | Char _ -> Set.empty
+        | Union -> Set.union (recur (left p)) (recur (right p))
+        | Cat ->
+            let prefix = recur (first p)
+            let suffix = recur (second p)
+            allPairs prefix suffix List.append
+            |> Seq.map List.ofSeq
+            |> Set.ofSeq
+        | Red f -> (recur (inner p)) |> Set.map (run f)
+        | Ref   -> recur (inner p)
+        | Plus -> Set.empty
+        | Star -> Set.empty
+
+    let parseNull p =
+        fix parseNull_ Set.empty p
+
+    let private dP_ c recur (p: Parser<_,_>): Parser<_,_> =
+        match snd (Graph.Nodes.find p.Index p.Graph) with
+        | Empty  -> p
+        | Eps    -> empty()
+        | Eps' _ -> empty()
+        | Char x -> if x = c then eps' (Set.singleton [x]) else empty()
+        | Union  -> union (recur (left p)) (recur (right p))
+        | Cat    ->
+            let a = first p
+            let b = second p
+            if nullable a then
+                union (cat (eps' (parseNull a)) (recur b)) (cat (recur a) b)
+            else
+                cat (recur a) b
+        | Red f  -> red (recur (inner p)) f
+        | Ref    -> p
+        | Plus   -> cat (recur (inner p)) (star (inner p))
+        | Star   -> cat (recur (inner p)) p
+
+    let dP c p =
+        fix (dP_ c) (empty()) p
 
 (*    let equalsOn f x (yobj:obj) =
             match yobj with
@@ -379,7 +521,7 @@ module ContextFree =
 //        | Union (a, b) -> Union (D expected a, D expected b)
 //        | Cat (a, b) when nullable a -> b
 //        | Cat (a, b) -> Cat (D expected a, b)
-////        | Rep a -> Cat (D expected a, Rep a)
+//        | Rep a -> Cat (D expected a, Rep a)
 //        | Ref a -> Ref (ref (D expected !a))
 //
 //    let rec parseNull = function

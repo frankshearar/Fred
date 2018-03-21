@@ -1,98 +1,95 @@
-﻿module Context.Test.Printing
+﻿module ContextFree.Test.Printing
 
 open Fred
-open FsCheck
 open NUnit.Framework
 open ContextFree
 open System
 
-    type Comp<'a> =
-        | Pure of 'a
-        | Lambda of (unit -> Comp<'a>)
-    let unresolved = function
-        | Pure _ -> false
-        | Lambda _ -> true
-    let next = function
-        | Pure v -> Pure v
-        | Lambda l -> l()
-
-    let execute (f: 'a -> Comp<'a>) (v: 'a): 'a =
-        let mutable current = Lambda <| fun () -> f v
-        while unresolved current do
-//            printfn "Trampolining on %A" current
-            current <- next current
-        match current with
-        | Pure v -> v
-        | Lambda _ -> failwith "diverged"
-
 //    let u (f: ('a -> 'b) -> 'a -> 'b) (x: 'a): ('a -> 'b) = (f f) x
 
-    let rec fix f x = f (fix f) x
-    let rec fix2 f x y = f (fix f) x y
+let rec fix f x = f (fix f) x
+let rec fix2 f x y = f (fix f) x y
 
-    let rec fix' f = fun x -> f (fix f) x
+let rec fix' f = fun x -> f (fix f) x
 
-    let rec fix'' = fun f -> fun x -> f (fix f) x
+let rec fix'' = fun f -> fun x -> f (fix f) x
 
 //    let fix f x =
 //        let mutable fix' = Unchecked.defaultof<_>
 //        fix' <- fun f -> f (fix' f)
 //        f (fix' f) x
 
-    let wrap = fun f -> fun f' -> fun p ->
-        let result = f f' p in
-        printfn "%A" result
-        result
+let wrap = fun f -> fun f' -> fun p ->
+    let result = f f' p in
+    printfn "%A" result
+    result
 
-    let memo =
-        fun f ->
-            let cache = ref Map.empty<'a, 'b>
-            fun f' ->
-                fun p ->
-                    match Map.tryFind p !cache with
-                    | Some v -> v
-                    | None ->
-                        let result = f f' p
-                        cache := Map.add p result !cache
-                        result
+let memo =
+    fun f ->
+        let cache = ref Map.empty<'a, 'b>
+        fun f' ->
+            fun p ->
+                match Map.tryFind p !cache with
+                | Some v -> v
+                | None ->
+                    let result = f f' p
+                    cache := Map.add p result !cache
+                    result
 
-    let rec fact i =
-        if i = 0 then 1
-        else i * fact (i - 1)
+let rec fact i =
+    if i = 0 then 1
+    else i * fact (i - 1)
 
-    let fact_tr i =
-        let rec fact' i acc =
-            if i = 0 then acc
-            else fact' (i - 1) (acc * i)
-        fact' i 1
+let fact_tr i =
+    let rec fact' i acc =
+        if i = 0 then acc
+        else fact' (i - 1) (acc * i)
+    fact' i 1
 
-    let fact_open recur i =
-        if i = 0 then 1
-        else i * recur (i - 1)
+let fact_open recur i =
+    if i = 0 then 1
+    else i * recur (i - 1)
 
-    let fact_cont (i: int): Comp<int> =
-        let rec fact_cont' i acc =
-//            printfn "fact_cont' %A %A" i acc
-            if i = 0 then Pure acc
-            else Lambda <| fun () -> fact_cont' (i - 1) (acc * i)
-        fact_cont' i 1
+type Comp<'a> =
+    | Pure of 'a
+    | Lambda of (unit -> Comp<'a>)
+let unresolved = function
+    | Pure _ -> false
+    | Lambda _ -> true
+let next = function
+    | Pure v -> Pure v
+    | Lambda l -> l()
 
-    let fact_cont_open (i: int): Comp<int> =
-        let fact_cont' recur i acc =
+let execute (f: 'a -> Comp<'a>) (v: 'a): 'a =
+    let mutable current = Lambda <| fun () -> f v
+    while unresolved current do
+        current <- next current
+    match current with
+    | Pure v -> v
+    | Lambda _ -> failwith "diverged"
+
+let fact_cont (i: int): Comp<int> =
+    let rec fact_cont' i acc =
+        if i = 0 then Pure acc
+        else Lambda <| fun () -> fact_cont' (i - 1) (acc * i)
+    fact_cont' i 1
+
+let fact_cont_open (i: int): Comp<int> =
+    let fact_cont' recur i acc =
 //            printfn "fact_cont_open ' %A %A" i acc
-            if i = 0 then Pure acc
-            else Lambda <| fun () -> recur (i - 1) (acc * i)
-        (fix fact_cont') i 1
+        if i = 0 then Pure acc
+        else Lambda <| fun () -> recur (i - 1) (acc * i)
+    (fix fact_cont') i 1
 
-    let fact_fix = fix (fact_open)
+let fact_fix = fix (fact_open)
 
-    let mem_fact = fix (memo (fact_open))
+let mem_fact = fix (memo (fact_open))
 
-    let time f =
-        let t = new System.Diagnostics.Stopwatch()
-        t.Start()
-        f()
-        printfn "Took %d ms" t.ElapsedMilliseconds
+let time f =
+    let t = new System.Diagnostics.Stopwatch()
+    t.Start()
+    f()
+    printfn "Took %d ms" t.ElapsedMilliseconds
 
 [<TestFixture>]
 type ``Cont``() =
@@ -197,7 +194,7 @@ type ``Printing``() =
 
     [<Test>]
     member __.``Red``() =
-        let p = (red (char 1) Id)
+        let p = (red (char 1) (Func "id"))
         let s = ContextFree.toDot p
         printfn "%s" s
         let actualLines = s.Split([|Environment.NewLine|], StringSplitOptions.None)
